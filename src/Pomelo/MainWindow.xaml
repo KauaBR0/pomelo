@@ -22,13 +22,23 @@
                 <StackPanel Margin="12">
                     <TextBlock x:Name="HowTo" TextWrapping="Wrap" Margin="0,0,0,14" />
 
-                    <GroupBox Header="Roda">
+                    <GroupBox Header="Rodas">
                         <StackPanel>
-                            <CheckBox x:Name="WheelEnabledBox" Content="Ativar a roda de conversão" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Tecla para abrir durante o arraste:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox x:Name="TriggerBox" Width="110" />
-                            </StackPanel>
+                            <CheckBox x:Name="WheelEnabledBox" Content="Ativar as rodas durante o arraste" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition />
+                                    <RowDefinition />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Converter formato:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                                <ComboBox x:Name="ConvertKeyBox" Grid.Column="1" Width="110" Margin="0,0,0,4" />
+                                <TextBlock Grid.Row="1" Text="Ferramentas:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox x:Name="ToolsKeyBox" Grid.Row="1" Grid.Column="1" Width="110" />
+                            </Grid>
                         </StackPanel>
                     </GroupBox>
 

@@ -1,7 +1,7 @@
 namespace Pomelo.Core.Settings;
 
-/// <summary>Key tapped during a drag to open the conversion wheel.</summary>
-public enum TriggerKey { Shift, Ctrl, Alt }
+/// <summary>Key tapped during a drag to open a wheel.</summary>
+public enum WheelKey { Shift, Ctrl, Alt }
 
 public enum OutputLocation { BesideOriginal, Downloads, Desktop, CustomFolder }
 
@@ -15,7 +15,10 @@ public sealed record AppSettings
     public const int MaxJpegQuality = 100;
 
     public bool WheelEnabled { get; init; } = true;
-    public TriggerKey TriggerKey { get; init; } = TriggerKey.Shift;
+    /// <summary>Opens the conversion wheel. Always differs from <see cref="ToolsKey"/>.</summary>
+    public WheelKey ConvertKey { get; init; } = WheelKey.Shift;
+    /// <summary>Opens the tools wheel. Always differs from <see cref="ConvertKey"/>.</summary>
+    public WheelKey ToolsKey { get; init; } = WheelKey.Ctrl;
     public OutputLocation OutputLocation { get; init; } = OutputLocation.BesideOriginal;
     public string? CustomOutputFolder { get; init; }
     public int JpegQuality { get; init; } = 92;

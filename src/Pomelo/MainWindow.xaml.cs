@@ -39,16 +39,23 @@ internal sealed partial class MainWindow : Window
         InitializeComponent();
         _startup = startup;
         _settings = settings;
-        TriggerBox.ItemsSource = Enum.GetValues<TriggerKey>();
+        ConvertKeyBox.ItemsSource = Enum.GetValues<WheelKey>();
+        ToolsKeyBox.ItemsSource = Enum.GetValues<WheelKey>();
         ShowSettings(settings);
 
         // Checked/Unchecked (not Click) so keyboard, mouse and UI Automation toggles all count.
         OnToggled(WheelEnabledBox, on => Update(s => s with { WheelEnabled = on }));
         OnToggled(NotifyBox, on => Update(s => s with { NotifyOnCompletion = on }));
-        TriggerBox.SelectionChanged += (_, _) =>
+        // Picking the other wheel's key swaps the two, so they never collide.
+        ConvertKeyBox.SelectionChanged += (_, _) =>
         {
-            if (TriggerBox.SelectedItem is TriggerKey key)
-                Update(s => s with { TriggerKey = key });
+            if (ConvertKeyBox.SelectedItem is WheelKey key)
+                Update(s => s with { ConvertKey = key, ToolsKey = s.ToolsKey == key ? s.ConvertKey : s.ToolsKey });
+        };
+        ToolsKeyBox.SelectionChanged += (_, _) =>
+        {
+            if (ToolsKeyBox.SelectedItem is WheelKey key)
+                Update(s => s with { ToolsKey = key, ConvertKey = s.ConvertKey == key ? s.ToolsKey : s.ConvertKey });
         };
         QualitySlider.ValueChanged += (_, e) => Update(s => s with { JpegQuality = (int)e.NewValue });
 
@@ -81,7 +88,8 @@ internal sealed partial class MainWindow : Window
         try
         {
             WheelEnabledBox.IsChecked = settings.WheelEnabled;
-            TriggerBox.SelectedItem = settings.TriggerKey;
+            ConvertKeyBox.SelectedItem = settings.ConvertKey;
+            ToolsKeyBox.SelectedItem = settings.ToolsKey;
             QualitySlider.Value = settings.JpegQuality;
             NotifyBox.IsChecked = settings.NotifyOnCompletion;
             CustomFolderText.Text = settings.CustomOutputFolder ?? "Outra pasta…";
@@ -95,8 +103,9 @@ internal sealed partial class MainWindow : Window
         {
             _loading = false;
         }
-        HowTo.Text = $"Comece a arrastar imagens, áudios ou vídeos no Explorer ou na Área de Trabalho, toque em " +
-                     $"{settings.TriggerKey} e solte sobre o formato desejado. Esc cancela.";
+        HowTo.Text = $"Comece a arrastar imagens, áudios ou vídeos no Explorer ou na Área de Trabalho e toque em " +
+                     $"{settings.ConvertKey} para converter o formato, ou em {settings.ToolsKey} para as ferramentas " +
+                     "(reduzir, girar, comprimir…). Solte sobre a opção desejada; Esc cancela.";
     }
 
     /// <param name="info">The FFmpeg in use, or null.</param>

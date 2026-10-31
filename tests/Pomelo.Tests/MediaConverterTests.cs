@@ -2,33 +2,12 @@ using System.Diagnostics;
 using Pomelo.Core.Conversion;
 using Pomelo.Core.Formats;
 using Pomelo.Core.Media;
+using static Pomelo.Tests.TestFfmpeg;
 
 namespace Pomelo.Tests;
 
-/// <summary>Skips (instead of failing) on machines without FFmpeg.</summary>
-public sealed class FfmpegFactAttribute : FactAttribute
-{
-    public FfmpegFactAttribute()
-    {
-        if (MediaConverterTests.Ffmpeg is null)
-            Skip = "FFmpeg não encontrado";
-    }
-}
-
-public sealed class FfmpegTheoryAttribute : TheoryAttribute
-{
-    public FfmpegTheoryAttribute()
-    {
-        if (MediaConverterTests.Ffmpeg is null)
-            Skip = "FFmpeg não encontrado";
-    }
-}
-
 public sealed class MediaConverterTests : IDisposable
 {
-    private static readonly Lazy<FfmpegInfo?> Located = new(() => FfmpegLocator.Locate(null));
-    public static FfmpegInfo? Ffmpeg => Located.Value;
-
     private readonly string _dir = Directory.CreateTempSubdirectory("pomelo-media-").FullName;
     private readonly ConversionOptions _options = new();
 
@@ -42,11 +21,11 @@ public sealed class MediaConverterTests : IDisposable
     public void Audio_converts_to_every_audio_output(string name)
     {
         var target = MediaFormats.AudioOutputs.Single(f => f.Name == name);
-        string tone = Generate("tone.mka", "-f", "lavfi", "-i", "sine=frequency=440:duration=1"); // Matches no output name.
+        string tone = Generate(At("tone.mka"), "-f", "lavfi", "-i", "sine=frequency=440:duration=1"); // Matches no output name.
 
-        string output = MediaConverter.Convert(tone, target, _options, Ffmpeg!);
+        string output = MediaConverter.Convert(tone, target, _options, Info!);
 
-        Assert.Equal(Path.Combine(_dir, "tone" + target.Extension), output);
+        Assert.Equal(At("tone" + target.Extension), output);
         AssertDecodes(output, "0:a:0");
     }
 
@@ -58,7 +37,7 @@ public sealed class MediaConverterTests : IDisposable
         var target = MediaFormats.VideoOutputs.Single(f => f.Name == name);
         string clip = Clip("clip.mkv", withAudio: true);
 
-        string output = MediaConverter.Convert(clip, target, _options, Ffmpeg!);
+        string output = MediaConverter.Convert(clip, target, _options, Info!);
 
         Assert.Equal(target.Extension, Path.GetExtension(output));
         AssertDecodes(output, target.Kind == MediaKind.Audio ? "0:a:0" : "0:v:0");
@@ -71,7 +50,7 @@ public sealed class MediaConverterTests : IDisposable
     {
         string clip = Clip("silent.mp4", withAudio: false);
 
-        var error = Assert.Throws<ConversionException>(() => MediaConverter.Convert(clip, MediaFormats.Mp3, _options, Ffmpeg!));
+        var error = Assert.Throws<ConversionException>(() => MediaConverter.Convert(clip, MediaFormats.Mp3, _options, Info!));
 
         Assert.Contains("faixa de áudio", error.Message);
         Assert.Equal([clip], Directory.GetFiles(_dir));
@@ -80,26 +59,25 @@ public sealed class MediaConverterTests : IDisposable
     [FfmpegFact]
     public void Existing_output_is_never_replaced()
     {
-        string tone = Generate("song.wav", "-f", "lavfi", "-i", "sine=duration=1");
-        string existing = Path.Combine(_dir, "song.mp3");
-        File.WriteAllText(existing, "keep me");
+        string tone = Generate(At("song.wav"), "-f", "lavfi", "-i", "sine=duration=1");
+        File.WriteAllText(At("song.mp3"), "keep me");
 
-        string output = MediaConverter.Convert(tone, MediaFormats.Mp3, _options, Ffmpeg!);
+        string output = MediaConverter.Convert(tone, MediaFormats.Mp3, _options, Info!);
 
-        Assert.Equal(Path.Combine(_dir, "song (1).mp3"), output);
-        Assert.Equal("keep me", File.ReadAllText(existing));
+        Assert.Equal(At("song (1).mp3"), output);
+        Assert.Equal("keep me", File.ReadAllText(At("song.mp3")));
     }
 
     [FfmpegFact]
     public void Cancelling_stops_ffmpeg_and_leaves_no_partial_file()
     {
-        string clip = Generate("long.mp4", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30:duration=30",
+        string clip = Generate(At("long.mp4"), "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30:duration=30",
             "-c:v", "libx264", "-preset", "ultrafast");
         using var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(800));
         var watch = Stopwatch.StartNew();
 
         Assert.ThrowsAny<OperationCanceledException>(() =>
-            MediaConverter.Convert(clip, MediaFormats.WebM, _options, Ffmpeg!, cancel.Token));
+            MediaConverter.Convert(clip, MediaFormats.WebM, _options, Info!, cancel.Token));
 
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
         Assert.Equal([clip], Directory.GetFiles(_dir));
@@ -108,40 +86,21 @@ public sealed class MediaConverterTests : IDisposable
     [FfmpegFact]
     public void Corrupt_input_reports_a_readable_error()
     {
-        string fake = Path.Combine(_dir, "fake.mp4");
+        string fake = At("fake.mp4");
         File.WriteAllText(fake, "not a video");
 
-        var error = Assert.Throws<ConversionException>(() => MediaConverter.Convert(fake, MediaFormats.Mp3, _options, Ffmpeg!));
+        var error = Assert.Throws<ConversionException>(() => MediaConverter.Convert(fake, MediaFormats.Mp3, _options, Info!));
 
         Assert.DoesNotContain("~pomelo", error.Message);
         Assert.Equal([fake], Directory.GetFiles(_dir));
     }
 
+    private string At(string name) => Path.Combine(_dir, name);
+
     private string Clip(string name, bool withAudio)
     {
         string[] video = ["-f", "lavfi", "-i", "testsrc2=size=161x121:rate=15:duration=1"];
         string[] audio = withAudio ? ["-f", "lavfi", "-i", "sine=duration=1", "-shortest"] : [];
-        return Generate(name, [.. video, .. audio, "-pix_fmt", "yuv444p"]);
-    }
-
-    private string Generate(string name, params string[] inputArgs)
-    {
-        string path = Path.Combine(_dir, name);
-        RunFfmpeg(["-hide_banner", "-loglevel", "error", "-y", .. inputArgs, path]);
-        return path;
-    }
-
-    private static void AssertDecodes(string path, string stream) =>
-        RunFfmpeg(["-hide_banner", "-loglevel", "error", "-i", path, "-map", stream, "-f", "null", "-"]);
-
-    private static void RunFfmpeg(string[] args)
-    {
-        var start = new ProcessStartInfo(Ffmpeg!.Path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
-        foreach (string arg in args)
-            start.ArgumentList.Add(arg);
-        using var process = Process.Start(start)!;
-        string stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        Assert.True(process.ExitCode == 0, $"ffmpeg {string.Join(' ', args)}\n{stderr}");
+        return Generate(At(name), [.. video, .. audio, "-pix_fmt", "yuv444p"]);
     }
 }

@@ -10,18 +10,31 @@ public sealed record MediaRecipe(string Muxer, IReadOnlyList<string> Encoders, I
 public static class MediaRecipes
 {
     /// <summary>H.264 and most players need yuv420p, which needs even dimensions.</summary>
-    private const string EvenSize = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
+    internal const string EvenSize = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
 
     private const string GifFilter =
         "fps=12,scale='min(640,iw)':-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4";
 
     // First video stream + first audio stream if any: skips cover art, subtitles and data tracks.
-    private static readonly string[] VideoMap = ["-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn"];
-    private static readonly string[] AudioMap = ["-map", "0:a:0", "-vn", "-sn", "-dn"];
+    internal static readonly string[] VideoMap = ["-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn"];
+    internal static readonly string[] AudioMap = ["-map", "0:a:0", "-vn", "-sn", "-dn"];
 
     private static readonly string[] H264Aac =
         [.. VideoMap, "-vf", EvenSize, "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
          "-c:a", "aac", "-b:a", "192k"];
+
+    private static readonly Dictionary<string, string> ContainerMuxers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".mp3"] = "mp3", [".m4a"] = "ipod", [".aac"] = "adts", [".wav"] = "wav", [".flac"] = "flac",
+        [".ogg"] = "ogg", [".oga"] = "ogg", [".opus"] = "opus", [".aiff"] = "aiff", [".aif"] = "aiff", [".wma"] = "asf",
+        [".mp4"] = "mp4", [".m4v"] = "mp4", [".mov"] = "mov", [".mkv"] = "matroska", [".webm"] = "webm",
+        [".avi"] = "avi", [".wmv"] = "asf", [".flv"] = "flv", [".mpg"] = "mpeg", [".mpeg"] = "mpeg",
+        [".ts"] = "mpegts", [".mts"] = "mpegts", [".m2ts"] = "mpegts", [".3gp"] = "3gp", [".ogv"] = "ogg",
+    };
+
+    /// <summary>Muxer that writes the same container as <paramref name="path"/> (for stream-copy tools).</summary>
+    public static string? SameContainerMuxer(string path) =>
+        ContainerMuxers.GetValueOrDefault(Path.GetExtension(path));
 
     public static MediaRecipe For(FileFormat format) => format switch
     {

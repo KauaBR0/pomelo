@@ -1,14 +1,13 @@
 using System.Collections.Concurrent;
 using System.Windows.Threading;
 using Pomelo.Core.Conversion;
-using Pomelo.Core.Formats;
 using Pomelo.Core.Media;
 
 namespace Pomelo.Conversion;
 
 internal sealed record ConversionResult(string Source, string? Output, string? Error);
 
-internal sealed record ConversionBatch(IReadOnlyList<string> Paths, FileFormat Target, ConversionOptions Options, FfmpegInfo? Ffmpeg);
+internal sealed record ConversionBatch(IReadOnlyList<string> Paths, IFileOperation Operation, ConversionOptions Options, FfmpegInfo? Ffmpeg);
 
 /// <summary>
 /// Runs conversions one file at a time on a dedicated STA thread (WPF imaging is
@@ -65,7 +64,7 @@ internal sealed class ConversionWorker : IDisposable
             ConversionResult result;
             try
             {
-                result = new(path, FileConverter.Convert(path, batch.Target, batch.Options, batch.Ffmpeg, _shutdown.Token), null);
+                result = new(path, batch.Operation.Apply(path, batch.Options, batch.Ffmpeg, _shutdown.Token), null);
             }
             catch (OperationCanceledException)
             {

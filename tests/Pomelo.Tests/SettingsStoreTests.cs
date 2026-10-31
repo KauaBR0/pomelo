@@ -16,7 +16,9 @@ public sealed class SettingsStoreTests : IDisposable
         var settings = new AppSettings
         {
             WheelEnabled = false,
-            TriggerKey = TriggerKey.Alt,
+            ConvertKey = WheelKey.Alt,
+            ToolsKey = WheelKey.Shift,
+            FfmpegPath = @"C:\Tools\ffmpeg.exe",
             OutputLocation = OutputLocation.CustomFolder,
             CustomOutputFolder = @"D:\Convertidos",
             JpegQuality = 75,
@@ -36,7 +38,7 @@ public sealed class SettingsStoreTests : IDisposable
 
     [Theory]
     [InlineData("{ not json")]
-    [InlineData("""{ "TriggerKey": "CapsLock" }""")]
+    [InlineData("""{ "ConvertKey": "CapsLock" }""")]
     public void Unreadable_file_loads_defaults(string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
@@ -51,11 +53,23 @@ public sealed class SettingsStoreTests : IDisposable
     public void Out_of_range_jpeg_quality_is_clamped(int stored, int expected)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, $$"""{ "JpegQuality": {{stored}}, "TriggerKey": "Ctrl" }""");
+        File.WriteAllText(FilePath, $$"""{ "JpegQuality": {{stored}}, "ConvertKey": "Alt" }""");
 
         var loaded = new SettingsStore(FilePath).Load();
 
         Assert.Equal(expected, loaded.JpegQuality);
-        Assert.Equal(TriggerKey.Ctrl, loaded.TriggerKey); // Other values survive the clamp.
+        Assert.Equal(WheelKey.Alt, loaded.ConvertKey); // Other values survive the clamp.
+    }
+
+    [Fact]
+    public void Both_wheels_on_the_same_key_are_separated_keeping_the_conversion_key()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        File.WriteAllText(FilePath, """{ "ConvertKey": "Ctrl", "ToolsKey": "Ctrl" }""");
+
+        var loaded = new SettingsStore(FilePath).Load();
+
+        Assert.Equal(WheelKey.Ctrl, loaded.ConvertKey);
+        Assert.NotEqual(loaded.ConvertKey, loaded.ToolsKey);
     }
 }

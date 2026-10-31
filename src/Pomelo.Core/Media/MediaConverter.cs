@@ -17,22 +17,28 @@ public static class MediaConverter
     /// <returns>The path of the created file.</returns>
     /// <exception cref="OperationCanceledException">The token was cancelled; FFmpeg was stopped.</exception>
     public static string Convert(string sourcePath, FileFormat target, ConversionOptions options, FfmpegInfo ffmpeg,
-        CancellationToken cancellation = default)
+        CancellationToken cancellation = default) =>
+        Apply(sourcePath, MediaRecipes.For(target), Path.GetFileNameWithoutExtension(sourcePath), target.Extension,
+            options, ffmpeg, cancellation);
+
+    /// <summary>Runs <paramref name="recipe"/> and publishes "<paramref name="outputName"/><paramref name="extension"/>", or "outputName (n)ext".</summary>
+    /// <returns>The path of the created file.</returns>
+    /// <exception cref="OperationCanceledException">The token was cancelled; FFmpeg was stopped.</exception>
+    public static string Apply(string sourcePath, MediaRecipe recipe, string outputName, string extension,
+        ConversionOptions options, FfmpegInfo ffmpeg, CancellationToken cancellation = default)
     {
         string source = Path.GetFullPath(sourcePath);
         string directory = options.OutputDirectory ?? Path.GetDirectoryName(source)!;
         if (!Directory.Exists(directory))
             throw new ConversionException($"A pasta de saída não existe: {directory}");
-
-        MediaRecipe recipe = MediaRecipes.For(target);
         if (!ffmpeg.HasEncoders(recipe.Encoders))
-            throw new ConversionException($"O FFmpeg em uso não tem o codificador necessário para {target.Name}.");
+            throw new ConversionException($"O FFmpeg em uso não tem o codificador necessário ({string.Join(", ", recipe.Encoders)}).");
 
         string temp = Path.Combine(directory, $"~pomelo-{Guid.NewGuid():N}.part");
         try
         {
             Run(ffmpeg.Path, source, recipe, temp, cancellation);
-            return UniqueFileWriter.MoveIntoPlace(temp, directory, Path.GetFileNameWithoutExtension(source), target.Extension);
+            return UniqueFileWriter.MoveIntoPlace(temp, directory, outputName, extension);
         }
         finally
         {

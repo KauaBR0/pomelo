@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using Pomelo.Wheel;
 using Pomelo.Core.Settings;
 using static Pomelo.Interop.NativeMethods;
 
@@ -14,8 +15,11 @@ namespace Pomelo.Input;
 /// </summary>
 internal sealed class GestureMonitor : IDisposable
 {
-    /// <summary>The trigger key was pressed during a drag. The wheel should appear under the cursor.</summary>
-    public event Action? WheelRequested;
+    /// <summary>
+    /// A wheel key was pressed during a drag: open that wheel under the cursor, or switch to it
+    /// if a wheel is already open.
+    /// </summary>
+    public event Action<WheelMode>? WheelRequested;
     /// <summary>The mouse button was released after a wheel request.</summary>
     public event Action? GestureEnded;
     /// <summary>Escape was pressed after a wheel request.</summary>
@@ -23,7 +27,8 @@ internal sealed class GestureMonitor : IDisposable
 
     public bool Enabled { get => _enabled; set => _enabled = value; }
 
-    public TriggerKey TriggerKey { get => (TriggerKey)_triggerKey; set => _triggerKey = (int)value; }
+    public WheelKey ConvertKey { get => (WheelKey)_convertKey; set => _convertKey = (int)value; }
+    public WheelKey ToolsKey { get => (WheelKey)_toolsKey; set => _toolsKey = (int)value; }
 
     private readonly Dispatcher _dispatcher;
     private readonly Thread _thread;
@@ -31,13 +36,14 @@ internal sealed class GestureMonitor : IDisposable
     private Exception? _startError;
     private uint _threadId;
     private volatile bool _enabled = true;
-    private volatile int _triggerKey = (int)TriggerKey.Shift;
+    private volatile int _convertKey = (int)WheelKey.Shift;
+    private volatile int _toolsKey = (int)WheelKey.Ctrl;
 
     // Hook-thread state only.
     private LowLevelHookProc? _mouseProc, _keyboardProc; // Rooted: native code holds these.
     private IntPtr _mouseHook, _keyboardHook;
     private int _dragDx, _dragDy;
-    private bool _buttonDown, _dragging, _triggerDown, _wheelRequested;
+    private bool _buttonDown, _dragging, _convertDown, _toolsDown, _wheelRequested;
     private POINT _downPoint;
 
     public GestureMonitor(Dispatcher dispatcher)
@@ -114,15 +120,19 @@ internal sealed class GestureMonitor : IDisposable
         {
             var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             bool down = (int)wParam is WM_KEYDOWN or WM_SYSKEYDOWN;
-            if (IsTrigger(info.vkCode))
+            WheelMode? mode = IsKey((WheelKey)_convertKey, info.vkCode) ? WheelMode.Convert
+                : IsKey((WheelKey)_toolsKey, info.vkCode) ? WheelMode.Tools
+                : null;
+            if (mode is { } requested)
             {
+                ref bool keyDown = ref requested == WheelMode.Convert ? ref _convertDown : ref _toolsDown;
                 // Key repeat sends repeated key-downs; react to the first one only.
-                if (down && !_triggerDown && _dragging && !_wheelRequested && _enabled)
+                if (down && !keyDown && _dragging && _enabled)
                 {
                     _wheelRequested = true;
-                    Raise(WheelRequested);
+                    _dispatcher.BeginInvoke(() => WheelRequested?.Invoke(requested));
                 }
-                _triggerDown = down;
+                keyDown = down;
             }
             else if (down && info.vkCode == VK_ESCAPE && _wheelRequested)
             {
@@ -133,10 +143,10 @@ internal sealed class GestureMonitor : IDisposable
         return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
     }
 
-    private bool IsTrigger(uint vk) => (TriggerKey)_triggerKey switch
+    private static bool IsKey(WheelKey key, uint vk) => key switch
     {
-        TriggerKey.Ctrl => vk is VK_CONTROL or VK_LCONTROL or VK_RCONTROL,
-        TriggerKey.Alt => vk is VK_MENU or VK_LMENU or VK_RMENU,
+        WheelKey.Ctrl => vk is VK_CONTROL or VK_LCONTROL or VK_RCONTROL,
+        WheelKey.Alt => vk is VK_MENU or VK_LMENU or VK_RMENU,
         _ => vk is VK_SHIFT or VK_LSHIFT or VK_RSHIFT,
     };
 

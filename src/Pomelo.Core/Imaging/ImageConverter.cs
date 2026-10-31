@@ -17,14 +17,24 @@ namespace Pomelo.Core.Imaging;
 public static class ImageConverter
 {
     /// <returns>The path of the created file.</returns>
-    public static string Convert(string sourcePath, FileFormat target, ConversionOptions? options = null)
+    public static string Convert(string sourcePath, FileFormat target, ConversionOptions? options = null) =>
+        Transform(sourcePath, target, image => image, Path.GetFileNameWithoutExtension(sourcePath), options);
+
+    /// <summary>
+    /// Loads the image (EXIF orientation baked in), applies <paramref name="transform"/>, encodes it as
+    /// <paramref name="target"/> without metadata and writes "<paramref name="outputName"/>.ext", or
+    /// "outputName (n).ext" when taken.
+    /// </summary>
+    /// <returns>The path of the created file.</returns>
+    public static string Transform(string sourcePath, FileFormat target, Func<BitmapSource, BitmapSource> transform,
+        string outputName, ConversionOptions? options = null)
     {
         options ??= new ConversionOptions();
         string directory = options.OutputDirectory ?? Path.GetDirectoryName(Path.GetFullPath(sourcePath))!;
         if (!Directory.Exists(directory))
             throw new ConversionException($"A pasta de saída não existe: {directory}");
 
-        BitmapSource image = Load(sourcePath, out var colorContexts);
+        BitmapSource image = transform(Load(sourcePath, out var colorContexts));
 
         BitmapEncoder encoder = target switch
         {
@@ -57,9 +67,22 @@ public static class ImageConverter
         using var buffer = new MemoryStream();
         encoder.Save(buffer);
 
-        return UniqueFileWriter.Write(directory, Path.GetFileNameWithoutExtension(sourcePath), target.Extension,
-            buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+        return UniqueFileWriter.Write(directory, outputName, target.Extension, buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
     }
+
+    /// <summary>Scales so the longer side is at most <paramref name="maxSide"/> pixels; never enlarges.</summary>
+    public static BitmapSource FitWithin(BitmapSource image, int maxSide)
+    {
+        double scale = (double)maxSide / Math.Max(image.PixelWidth, image.PixelHeight);
+        return scale >= 1 ? image : Scale(image, scale);
+    }
+
+    public static BitmapSource Scale(BitmapSource image, double factor) =>
+        new TransformedBitmap(image, new ScaleTransform(factor, factor));
+
+    /// <param name="degrees">Multiple of 90; positive is clockwise.</param>
+    public static BitmapSource Rotate(BitmapSource image, int degrees) =>
+        new TransformedBitmap(image, new RotateTransform(degrees));
 
     private static BitmapSource Load(string path, out ReadOnlyCollection<ColorContext>? colorContexts)
     {

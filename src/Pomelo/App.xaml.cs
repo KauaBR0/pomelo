@@ -58,14 +58,14 @@ public partial class App : Application
         _main = new MainWindow(_settings, StartupRegistration.ForCurrentExecutable());
         MainWindow = _main;
 
-        _gestures.WheelRequested += _wheel.OpenAtCursor;
+        _gestures.WheelRequested += _wheel.Request;
         _gestures.GestureEnded += _wheel.EndGesture;
         _gestures.Cancelled += _wheel.Dismiss;
         _wheel.Ffmpeg = () => _ffmpeg;
-        _wheel.ConversionRequested += (paths, target) => _worker.Enqueue(new ConversionBatch(paths, target,
+        _wheel.OperationRequested += (paths, operation) => _worker.Enqueue(new ConversionBatch(paths, operation,
             new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality), _ffmpeg));
         _worker.FileStarted += (path, index, count) =>
-            _tray.SetStatus(count == 1 ? $"convertendo {Path.GetFileName(path)}" : $"convertendo {Path.GetFileName(path)} ({index}/{count})");
+            _tray.SetStatus(count == 1 ? $"processando {Path.GetFileName(path)}" : $"processando {Path.GetFileName(path)} ({index}/{count})");
         _worker.FileCompleted += _main.Report;
         _worker.BatchCompleted += (batch, results) =>
         {
@@ -112,7 +112,8 @@ public partial class App : Application
     private void ApplyRuntime(AppSettings settings)
     {
         _gestures!.Enabled = settings.WheelEnabled;
-        _gestures.TriggerKey = settings.TriggerKey;
+        _gestures.ConvertKey = settings.ConvertKey;
+        _gestures.ToolsKey = settings.ToolsKey;
         _tray!.SetWheelEnabled(settings.WheelEnabled);
         if (!settings.WheelEnabled)
             _wheel.Dismiss();
@@ -166,16 +167,16 @@ public partial class App : Application
 
         var converted = results.Where(r => r.Output is not null).ToList();
         var failed = results.Where(r => r.Error is not null).ToList();
-        string format = batch.Target.Name;
+        string done = batch.Operation.DoneTitle;
         string? reveal = converted.LastOrDefault()?.Output;
 
         (string title, string text) = (converted.Count, failed.Count) switch
         {
-            (1, 0) => ($"Convertido para {format}", Path.GetFileName(reveal!)),
-            (_, 0) => ($"{converted.Count} arquivos convertidos para {format}", Path.GetDirectoryName(reveal!)!),
-            (0, 1) => ("Falha na conversão", $"{Path.GetFileName(failed[0].Source)}: {failed[0].Error}"),
+            (1, 0) => (done, Path.GetFileName(reveal!)),
+            (_, 0) => ($"{done}: {converted.Count} arquivos", Path.GetDirectoryName(reveal!)!),
+            (0, 1) => ("Falha", $"{Path.GetFileName(failed[0].Source)}: {failed[0].Error}"),
             (0, _) => ($"{failed.Count} arquivos falharam", "Abra o Pomelo para ver os detalhes."),
-            _ => ($"{converted.Count} convertidos, {failed.Count} com falha", "Abra o Pomelo para ver os detalhes."),
+            _ => ($"{converted.Count} prontos, {failed.Count} com falha", "Abra o Pomelo para ver os detalhes."),
         };
         _tray!.Notify(title, text, reveal);
     }

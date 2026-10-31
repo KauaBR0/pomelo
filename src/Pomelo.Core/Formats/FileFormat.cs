@@ -9,3 +9,13 @@ public sealed record FileFormat(string Name, string Extension, IReadOnlyList<str
     public bool Matches(string path) =>
         Aliases.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 }
+
+public static class InputKind
+{
+    /// <returns>What Pomelo can read <paramref name="path"/> as (by extension), or null.</returns>
+    public static MediaKind? Of(string path) =>
+        ImageFormats.IsInput(path) ? MediaKind.Image
+        : MediaFormats.IsVideoInput(path) ? MediaKind.Video
+        : MediaFormats.IsAudioInput(path) ? MediaKind.Audio
+        : null;
+}

@@ -12,7 +12,8 @@ internal sealed class WheelView : FrameworkElement
 
     private static readonly Brush RingFill = Frozen(new SolidColorBrush(Color.FromArgb(0xF2, 0x1C, 0x1C, 0x1E)));
     private static readonly Brush HubFill = Frozen(new SolidColorBrush(Color.FromArgb(0xF7, 0x2A, 0x2A, 0x2D)));
-    private static readonly Brush Accent = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x1F)));
+    public static readonly Brush ConvertAccent = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x1F)));
+    public static readonly Brush ToolsAccent = Frozen(new SolidColorBrush(Color.FromRgb(0x3C, 0xC7, 0xB5)));
     private static readonly Brush Text = Brushes.White;
     private static readonly Brush MutedText = Frozen(new SolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF)));
     private static readonly Pen Edge = Frozen(new Pen(Frozen(new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF))), 1));
@@ -24,6 +25,9 @@ internal sealed class WheelView : FrameworkElement
     private string _title = "", _subtitle = "";
 
     public IReadOnlyList<string> Labels { get => _labels; set { _labels = value; _hover = -1; InvalidateVisual(); } }
+
+    /// <summary>Fill of the hovered sector; distinguishes the conversion and tools wheels.</summary>
+    public Brush Highlight { get; set; } = ConvertAccent;
 
     public int Hover
     {
@@ -70,7 +74,7 @@ internal sealed class WheelView : FrameworkElement
         {
             double start = i * sweep;
             if (i == _hover)
-                dc.DrawGeometry(Accent, null, n == 1 ? ring : Sector(c, InnerRadius + 3, outer - 3, start, sweep));
+                dc.DrawGeometry(Highlight, null, n == 1 ? ring : Sector(c, InnerRadius + 3, outer - 3, start, sweep));
             if (n > 1)
                 dc.DrawLine(Edge, Polar(c, InnerRadius, start), Polar(c, outer, start));
 

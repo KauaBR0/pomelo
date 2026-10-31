@@ -22,4 +22,15 @@ public static class ImageFormats
     };
 
     public static bool IsInput(string path) => Inputs.Contains(Path.GetExtension(path));
+
+    /// <summary>
+    /// The format an edited copy keeps: the input's own format when Pomelo can write it,
+    /// otherwise PNG for formats that may carry transparency (WebP, ICO) and JPG for photos (HEIC, AVIF…).
+    /// </summary>
+    public static FileFormat SameOrClosest(string path)
+    {
+        if (Outputs.FirstOrDefault(f => f.Matches(path)) is { } same)
+            return same;
+        return Path.GetExtension(path).ToLowerInvariant() is ".webp" or ".ico" ? Png : Jpeg;
+    }
 }

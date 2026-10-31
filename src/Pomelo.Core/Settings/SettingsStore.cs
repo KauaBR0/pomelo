@@ -30,11 +30,16 @@ public sealed class SettingsStore(string path)
         }
 
         settings ??= new AppSettings();
+        var convertKey = Enum.IsDefined(settings.ConvertKey) ? settings.ConvertKey : WheelKey.Shift;
+        var toolsKey = Enum.IsDefined(settings.ToolsKey) ? settings.ToolsKey : WheelKey.Ctrl;
+        if (toolsKey == convertKey)
+            toolsKey = Enum.GetValues<WheelKey>().First(k => k != convertKey);
         return settings with
         {
             JpegQuality = Math.Clamp(settings.JpegQuality, AppSettings.MinJpegQuality, AppSettings.MaxJpegQuality),
             OutputLocation = Enum.IsDefined(settings.OutputLocation) ? settings.OutputLocation : OutputLocation.BesideOriginal,
-            TriggerKey = Enum.IsDefined(settings.TriggerKey) ? settings.TriggerKey : TriggerKey.Shift,
+            ConvertKey = convertKey,
+            ToolsKey = toolsKey,
         };
     }
 

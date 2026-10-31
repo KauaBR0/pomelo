@@ -4,8 +4,8 @@ using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Pomelo.Core.Conversion;
-using Pomelo.Core.Formats;
 using Pomelo.Core.Media;
+using Pomelo.Core.Tools;
 using static Pomelo.Interop.NativeMethods;
 
 namespace Pomelo.Wheel;
@@ -20,8 +20,8 @@ internal sealed partial class WheelWindow : Window
     private static readonly TimeSpan ReleaseGrace = TimeSpan.FromMilliseconds(400);
     private static readonly TimeSpan NoTargetsLinger = TimeSpan.FromMilliseconds(1200);
 
-    /// <summary>Raised after the wheel closes, with the dropped files and chosen target.</summary>
-    public event Action<IReadOnlyList<string>, FileFormat>? ConversionRequested;
+    /// <summary>Raised after the wheel closes, with the dropped files and the chosen conversion or tool.</summary>
+    public event Action<IReadOnlyList<string>, IFileOperation>? OperationRequested;
 
     /// <summary>Current FFmpeg, read when files enter the wheel; null hides audio/video targets.</summary>
     public Func<FfmpegInfo?> Ffmpeg { get; set; } = () => null;
@@ -29,9 +29,11 @@ internal sealed partial class WheelWindow : Window
     private readonly IntPtr _hwnd;
     private readonly DispatcherTimer _hideTimer;
     private IReadOnlyList<string> _paths = [];
-    private IReadOnlyList<FileFormat> _targets = [];
+    private IReadOnlyList<IFileOperation> _operations = [];
     private string? _hint;
     private bool _revealed;
+    private WheelMode _mode;
+    private bool _inGesture; // Between a key press and the mouse button going up.
 
     public WheelWindow()
     {
@@ -49,12 +51,23 @@ internal sealed partial class WheelWindow : Window
         Drop += OnDrop;
     }
 
+    /// <summary>Opens <paramref name="mode"/>'s wheel under the cursor, or switches to it if a wheel is open.</summary>
+    public void Request(WheelMode mode)
+    {
+        if (IsVisible && _inGesture)
+            SwitchTo(mode);
+        else
+            OpenAtCursor(mode);
+    }
+
     /// <summary>Opens the (still invisible) wheel centred on the cursor.</summary>
-    public void OpenAtCursor()
+    private void OpenAtCursor(WheelMode mode)
     {
         _hideTimer.Stop();
+        _mode = mode;
+        _inGesture = true;
         _paths = [];
-        _targets = [];
+        _operations = [];
         _hint = null;
         _revealed = false;
         View.Labels = [];
@@ -79,12 +92,14 @@ internal sealed partial class WheelWindow : Window
     /// <summary>The mouse button went up. A drop on the wheel may still be in flight.</summary>
     public void EndGesture()
     {
+        _inGesture = false;
         if (IsVisible && !_hideTimer.IsEnabled)
             HideAfter(ReleaseGrace);
     }
 
     public void Dismiss()
     {
+        _inGesture = false;
         _hideTimer.Stop();
         Hide();
     }
@@ -110,9 +125,7 @@ internal sealed partial class WheelWindow : Window
     {
         _revealed = true;
         _paths = paths;
-        (_targets, _hint) = ConversionCatalog.For(paths, Ffmpeg());
-        View.Labels = _targets.Select(t => t.Name).ToList();
-        ShowHover(-1);
+        LoadOperations();
 
         if (SystemParameters.ClientAreaAnimation)
         {
@@ -127,8 +140,37 @@ internal sealed partial class WheelWindow : Window
         {
             View.Opacity = 1;
         }
+    }
 
-        if (_targets.Count == 0)
+    private void SwitchTo(WheelMode mode)
+    {
+        if (mode == _mode)
+            return;
+        _mode = mode;
+        if (!_revealed)
+            return; // Files not known yet; DragEnter will load this mode.
+        _hideTimer.Stop(); // Only the "nothing to offer" linger can be running mid-drag.
+        LoadOperations();
+    }
+
+    private void LoadOperations()
+    {
+        if (_mode == WheelMode.Convert)
+        {
+            var choices = ConversionCatalog.For(_paths, Ffmpeg());
+            _operations = choices.Targets.Select(t => (IFileOperation)new ConvertOperation(t)).ToList();
+            _hint = choices.Hint;
+        }
+        else
+        {
+            var choices = ToolCatalog.For(_paths, Ffmpeg());
+            _operations = choices.Tools;
+            _hint = choices.Hint;
+        }
+        View.Highlight = _mode == WheelMode.Convert ? WheelView.ConvertAccent : WheelView.ToolsAccent;
+        View.Labels = _operations.Select(o => o.Label).ToList();
+        ShowHover(-1);
+        if (_operations.Count == 0)
             HideAfter(NoTargetsLinger);
     }
 
@@ -146,9 +188,9 @@ internal sealed partial class WheelWindow : Window
     {
         View.Hover = sector;
         string title = _paths.Count == 1 ? "1 arquivo" : $"{_paths.Count} arquivos";
-        string subtitle = sector >= 0 ? $"→ {_targets[sector].Name}"
-            : _targets.Count > 0 ? "Converter para…"
-            : _hint ?? "Sem conversões";
+        string subtitle = sector >= 0 ? _operations[sector].HubText
+            : _operations.Count > 0 ? (_mode == WheelMode.Convert ? "Converter para…" : "Ferramentas")
+            : _hint ?? (_mode == WheelMode.Convert ? "Sem conversões" : "Sem ferramentas");
         View.SetHub(title, subtitle);
     }
 
@@ -159,12 +201,12 @@ internal sealed partial class WheelWindow : Window
         {
             e.Effects = DragDropEffects.Copy;
             var paths = _paths;
-            var target = _targets[sector];
+            var operation = _operations[sector];
             // Return from Drop immediately: the drag source (Explorer) is blocked until we do.
             Dispatcher.BeginInvoke(() =>
             {
                 Dismiss();
-                ConversionRequested?.Invoke(paths, target);
+                OperationRequested?.Invoke(paths, operation);
             });
         }
         else

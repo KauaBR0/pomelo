@@ -31,7 +31,7 @@ Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac.
    Com a roda aberta, tocar outra dessas teclas troca de roda.
 4. **Solte** os arquivos sobre a opção. Soltar no centro, ou apertar **Esc**, cancela.
 
-O original nunca é alterado nem movido, e nenhum arquivo existente é substituído: se `foto.jpg` já existir, o resultado vira `foto (1).jpg`. Ao terminar, uma notificação mostra o resultado; clicar nela abre o Explorer com o arquivo selecionado.
+Conversões, ferramentas e cópias preservam o original; apenas a ação **Mover…**, depois de escolher o destino, remove os itens da origem. Nenhum arquivo existente é substituído: se `foto.jpg` já existir, o resultado vira `foto (1).jpg`. Ao terminar, uma notificação mostra o resultado; clicar nela abre o Explorer com o item selecionado.
 
 ## Ferramentas
 

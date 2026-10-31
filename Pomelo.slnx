@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Pomelo.Core/Pomelo.Core.csproj" />
+    <Project Path="src/Pomelo/Pomelo.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Pomelo.Tests/Pomelo.Tests.csproj" />
+  </Folder>
+</Solution>

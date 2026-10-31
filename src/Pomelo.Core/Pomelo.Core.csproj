@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- WPF imaging = Windows Imaging Component (WIC), the Windows counterpart of ImageIO. -->
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF SDK leaves System.IO out of implicit usings. -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+</Project>

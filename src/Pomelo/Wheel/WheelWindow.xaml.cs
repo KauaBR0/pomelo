@@ -39,6 +39,8 @@ internal sealed partial class WheelWindow : Window
     private IReadOnlyList<string> _paths = [];
     private IReadOnlyList<WheelItem> _items = [];
     private string? _hint;
+    private string _title = "";
+    private bool _acceptingDrop;
     private bool _revealed;
     private WheelMode _mode;
     private bool _inGesture; // Between a key press and the mouse button going up.
@@ -78,6 +80,7 @@ internal sealed partial class WheelWindow : Window
         _items = [];
         _hint = null;
         _revealed = false;
+        _acceptingDrop = false;
         View.Labels = [];
         View.BeginAnimation(OpacityProperty, null);
         View.Opacity = 0;
@@ -93,6 +96,8 @@ internal sealed partial class WheelWindow : Window
         int x = Math.Max(work.Left, Math.Min(cursor.X - size / 2, work.Right - size));
         int y = Math.Max(work.Top, Math.Min(cursor.Y - size / 2, work.Bottom - size));
 
+        // Let WPF process the monitor's DPI change before applying the final pixel rectangle.
+        SetWindowPos(_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
         Show();
         SetWindowPos(_hwnd, HWND_TOPMOST, x, y, size, size, SWP_NOACTIVATE);
     }
@@ -101,19 +106,32 @@ internal sealed partial class WheelWindow : Window
     public void EndGesture()
     {
         _inGesture = false;
-        if (IsVisible && !_hideTimer.IsEnabled)
+        if (!_revealed)
+            Dismiss();
+        else if (IsVisible && !_hideTimer.IsEnabled)
             HideAfter(ReleaseGrace);
     }
 
     public void Dismiss()
     {
         _inGesture = false;
+        _acceptingDrop = false;
         _hideTimer.Stop();
         Hide();
     }
 
     private void OnDragEnter(object sender, DragEventArgs e)
     {
+        if (!_inGesture)
+        {
+            // The grace period belongs only to the previous drag's pending Drop.
+            _acceptingDrop = false;
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            Dispatcher.BeginInvoke(Dismiss);
+            return;
+        }
+        _acceptingDrop = true;
         if (!_revealed)
         {
             if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } paths)
@@ -133,6 +151,9 @@ internal sealed partial class WheelWindow : Window
     {
         _revealed = true;
         _paths = paths;
+        _title = paths.Length == 1
+            ? (Directory.Exists(paths[0]) ? "1 pasta" : "1 arquivo")
+            : (paths.Any(Directory.Exists) ? $"{paths.Length} itens" : $"{paths.Length} arquivos");
         LoadOperations();
 
         if (SystemParameters.ClientAreaAnimation)
@@ -197,7 +218,7 @@ internal sealed partial class WheelWindow : Window
 
     private void UpdateHover(DragEventArgs e)
     {
-        int sector = _revealed ? View.SectorAt(e.GetPosition(View)) : -1;
+        int sector = _revealed && _acceptingDrop ? View.SectorAt(e.GetPosition(View)) : -1;
         ShowHover(sector);
         e.Effects = sector >= 0 && e.AllowedEffects.HasFlag(DragDropEffects.Copy)
             ? DragDropEffects.Copy // Never Move: Shift means "move" in Explorer, and we must not delete originals.
@@ -208,18 +229,15 @@ internal sealed partial class WheelWindow : Window
     private void ShowHover(int sector)
     {
         View.Hover = sector;
-        string title = _paths.Count == 1
-            ? (Directory.Exists(_paths[0]) ? "1 pasta" : "1 arquivo")
-            : (_paths.Any(Directory.Exists) ? $"{_paths.Count} itens" : $"{_paths.Count} arquivos");
         string subtitle = sector >= 0 ? _items[sector].HubText
             : _items.Count > 0 ? _mode switch { WheelMode.Convert => "Converter para…", WheelMode.Tools => "Ferramentas", _ => "Ações" }
             : _hint ?? _mode switch { WheelMode.Convert => "Sem conversões", WheelMode.Tools => "Sem ferramentas", _ => "Sem ações" };
-        View.SetHub(title, subtitle);
+        View.SetHub(_title, subtitle);
     }
 
     private void OnDrop(object sender, DragEventArgs e)
     {
-        int sector = _revealed ? View.SectorAt(e.GetPosition(View)) : -1;
+        int sector = _revealed && _acceptingDrop ? View.SectorAt(e.GetPosition(View)) : -1;
         if (sector >= 0 && e.AllowedEffects.HasFlag(DragDropEffects.Copy))
         {
             e.Effects = DragDropEffects.Copy;

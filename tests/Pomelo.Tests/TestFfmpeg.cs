@@ -10,6 +10,11 @@ public static partial class TestFfmpeg
     private static readonly Lazy<FfmpegInfo?> Located = new(() => FfmpegLocator.Locate(null));
     public static FfmpegInfo? Info => Located.Value;
 
+    internal static string? SkipReason(string[] encoders) =>
+        Info is null ? "FFmpeg não encontrado"
+        : Info.HasEncoders(encoders) ? null
+        : $"O FFmpeg instalado não tem: {string.Join(", ", encoders.Where(e => !Info.Encoders.Contains(e)))}";
+
     /// <summary>Runs FFmpeg to create <paramref name="path"/> from <paramref name="inputArgs"/>.</summary>
     public static string Generate(string path, params string[] inputArgs)
     {
@@ -56,20 +61,13 @@ public static partial class TestFfmpeg
     private static partial Regex VideoSizePattern();
 }
 
+/// <summary>Skips when FFmpeg, or one of <paramref name="encoders"/>, is not available on this machine.</summary>
 public sealed class FfmpegFactAttribute : FactAttribute
 {
-    public FfmpegFactAttribute()
-    {
-        if (TestFfmpeg.Info is null)
-            Skip = "FFmpeg não encontrado";
-    }
+    public FfmpegFactAttribute(params string[] encoders) => Skip = TestFfmpeg.SkipReason(encoders);
 }
 
 public sealed class FfmpegTheoryAttribute : TheoryAttribute
 {
-    public FfmpegTheoryAttribute()
-    {
-        if (TestFfmpeg.Info is null)
-            Skip = "FFmpeg não encontrado";
-    }
+    public FfmpegTheoryAttribute(params string[] encoders) => Skip = TestFfmpeg.SkipReason(encoders);
 }

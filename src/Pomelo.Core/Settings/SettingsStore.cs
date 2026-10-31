@@ -25,8 +25,9 @@ public sealed class SettingsStore(string path)
             using var stream = File.OpenRead(Path);
             settings = JsonSerializer.Deserialize<AppSettings>(stream, Json);
         }
-        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            // Missing, locked, denied or corrupt: start with defaults rather than not starting at all.
         }
 
         settings ??= new AppSettings();

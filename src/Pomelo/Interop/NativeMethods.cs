@@ -38,6 +38,7 @@ internal static class NativeMethods
 
     public static readonly IntPtr HWND_TOPMOST = new(-1);
     public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_NOSIZE = 0x0001;
 
     public const uint PM_NOREMOVE = 0x0000;
     public const uint MONITOR_DEFAULTTONEAREST = 2;

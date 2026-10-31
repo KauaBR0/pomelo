@@ -45,7 +45,8 @@ public static class MediaRecipes
         _ when format == MediaFormats.Ogg => new("ogg", ["libvorbis"], [.. AudioMap, "-c:a", "libvorbis", "-q:a", "5"]),
         _ when format == MediaFormats.Opus => new("opus", ["libopus"], [.. AudioMap, "-c:a", "libopus", "-b:a", "128k"]),
         _ when format == MediaFormats.Aiff => new("aiff", ["pcm_s16be"], [.. AudioMap, "-c:a", "pcm_s16be"]),
-        _ when format == MediaFormats.Wma => new("asf", ["wmav2"], [.. AudioMap, "-c:a", "wmav2", "-b:a", "192k"]),
+        // wmav2 accepts at most 2 channels and FFmpeg does not downmix for it on its own (5.1 sources fail).
+        _ when format == MediaFormats.Wma => new("asf", ["wmav2"], [.. AudioMap, "-c:a", "wmav2", "-b:a", "192k", "-ac", "2"]),
 
         _ when format == MediaFormats.Mp4 => new("mp4", ["libx264", "aac"], [.. H264Aac, "-movflags", "+faststart"]),
         _ when format == MediaFormats.Mov => new("mov", ["libx264", "aac"], [.. H264Aac, "-movflags", "+faststart"]),
@@ -56,7 +57,7 @@ public static class MediaRecipes
         _ when format == MediaFormats.Avi => new("avi", ["mpeg4", "libmp3lame"],
             [.. VideoMap, "-vf", EvenSize, "-c:v", "mpeg4", "-q:v", "3", "-pix_fmt", "yuv420p", "-c:a", "libmp3lame", "-q:a", "2"]),
         _ when format == MediaFormats.Wmv => new("asf", ["wmv2", "wmav2"],
-            [.. VideoMap, "-vf", EvenSize, "-c:v", "wmv2", "-q:v", "3", "-c:a", "wmav2", "-b:a", "192k"]),
+            [.. VideoMap, "-vf", EvenSize, "-c:v", "wmv2", "-q:v", "3", "-c:a", "wmav2", "-b:a", "192k", "-ac", "2"]),
         _ when format == MediaFormats.AnimatedGif => new("gif", ["gif"],
             ["-map", "0:v:0", "-an", "-sn", "-dn", "-vf", GifFilter, "-loop", "0"]),
 

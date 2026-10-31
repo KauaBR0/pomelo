@@ -10,7 +10,13 @@ public sealed class ImageConverterTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("pomelo-tests-").FullName;
 
-    public void Dispose() => Directory.Delete(_dir, recursive: true);
+    public void Dispose()
+    {
+        // ColorContext has no Dispose; release its URI-backed profile handle before removing fixtures.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        Directory.Delete(_dir, recursive: true);
+    }
 
     [Fact]
     public void Jpeg_output_composites_transparency_onto_white()
@@ -130,6 +136,106 @@ public sealed class ImageConverterTests : IDisposable
 
         Assert.Throws<ConversionException>(() => ImageConverter.Convert(fake, ImageFormats.Jpeg));
         Assert.Equal([fake], Directory.GetFiles(_dir));
+    }
+
+    [Theory]
+    [InlineData("JPG")]
+    [InlineData("PNG")]
+    public void Cmyk_profile_is_converted_not_embedded_into_rgb_pixels(string name)
+    {
+        string profilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "spool", "drivers", "color", "RSWOP.icm");
+        var profile = new ColorContext(new Uri(profilePath));
+        byte[] pixels = Enumerable.Repeat(new byte[] { 255, 0, 0, 0 }, 16 * 16).SelectMany(p => p).ToArray();
+        var bitmap = BitmapSource.Create(16, 16, 96, 96, PixelFormats.Cmyk32, null, pixels, 16 * 4);
+        string source = SaveProfiledTiff("print.tiff", bitmap, profile);
+
+        string output = ImageConverter.Convert(source, ImageFormats.Outputs.Single(f => f.Name == name));
+
+        var frame = BitmapDecoder.Create(new Uri(output), BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+        Assert.True(frame.ColorContexts is null || frame.ColorContexts.Count == 0);
+        // Independent LittleCMS (Pillow ImageCms), RSWOP.icm perceptual cyan -> sRGB.
+        AssertNear(0x009FD7, ReadBgra(output, out _, out _)[0]);
+    }
+
+    [Theory]
+    [InlineData("BMP")]
+    [InlineData("GIF")]
+    public void Indexed_rgb_with_a_profile_converts_to_unprofiled_outputs(string name)
+    {
+        var palette = new BitmapPalette([Colors.Red, Colors.Blue]);
+        byte[] pixels = Enumerable.Repeat(new byte[] { 0, 1 }, 8 * 16).SelectMany(p => p).ToArray();
+        var bitmap = BitmapSource.Create(16, 16, 96, 96, PixelFormats.Indexed8, palette, pixels, 16);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap, null, null, new([new ColorContext(PixelFormats.Bgra32)])));
+        string source = Path.Combine(_dir, "indexed.png");
+        using (var file = File.Create(source))
+            encoder.Save(file);
+
+        string output = ImageConverter.Convert(source, ImageFormats.Outputs.Single(f => f.Name == name));
+
+        uint[] decoded = ReadBgra(output, out _, out _);
+        AssertNear(0xFF0000, decoded[0]);
+        AssertNear(0x0000FF, decoded[1]);
+    }
+
+    [Theory]
+    [InlineData("JPG")]
+    [InlineData("PNG")]
+    public void Gray_profile_is_converted_before_rgb_encoding(string name)
+    {
+        string profilePath = Path.Combine(_dir, "gray.icc");
+        File.WriteAllBytes(profilePath, GrayProfile());
+        var bitmap = BitmapSource.Create(16, 16, 96, 96, PixelFormats.Gray8, null,
+            Enumerable.Repeat((byte)128, 256).ToArray(), 16);
+        string source = SaveProfiledTiff("gray.tiff", bitmap, new ColorContext(new Uri(profilePath)));
+
+        string output = ImageConverter.Convert(source, ImageFormats.Outputs.Single(f => f.Name == name));
+
+        var frame = BitmapDecoder.Create(new Uri(output), BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+        Assert.True(frame.ColorContexts is null || frame.ColorContexts.Count == 0);
+        AssertNear(0x818181, ReadBgra(output, out _, out _)[0]);
+    }
+
+    private string SaveProfiledTiff(string name, BitmapSource bitmap, ColorContext profile)
+    {
+        var encoder = new TiffBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap, null, null, new([profile])));
+        string path = Path.Combine(_dir, name);
+        using var file = File.Create(path);
+        encoder.Save(file);
+        return path;
+    }
+
+    // Minimal ICC v2 gray display profile: D50 white point and gamma 2.2, no external fixture.
+    private static byte[] GrayProfile()
+    {
+        byte[] profile = new byte[336];
+        void Number(int offset, uint value) =>
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(profile.AsSpan(offset, 4), value);
+        void Text(int offset, string value) => System.Text.Encoding.ASCII.GetBytes(value).CopyTo(profile, offset);
+        Number(0, 336);
+        Number(8, 0x02100000);
+        Text(12, "mntrGRAYXYZ ");
+        profile[24] = 7; profile[25] = 234; // 2026-01-01 (ICC requires a valid creation date).
+        profile[27] = 1; profile[29] = 1;
+        Text(36, "acspMSFT");
+        Number(64, 0);
+        Number(68, 0xF6D6);
+        Number(72, 0x10000);
+        Number(76, 0xD32D);
+        Number(128, 4);
+        Text(132, "wtpt"); Number(136, 180); Number(140, 20);
+        Text(144, "kTRC"); Number(148, 200); Number(152, 14);
+        Text(156, "desc"); Number(160, 216); Number(164, 95);
+        Text(168, "cprt"); Number(172, 312); Number(176, 22);
+        Text(180, "XYZ ");
+        Number(188, 0xF6D6); Number(192, 0x10000); Number(196, 0xD32D);
+        Text(200, "curv"); Number(208, 1);
+        profile[212] = 2; profile[213] = 51; // u8Fixed8 gamma 2.199.
+        Text(216, "desc"); Number(224, 5); Text(228, "Gray\0");
+        Text(312, "text"); Text(320, "Public domain\0");
+        return profile;
     }
 
     private string SavePng(string name, int w, int h, Func<int, int, uint> argb)

@@ -122,7 +122,7 @@ public sealed class ToolTests : IDisposable
 
     // ---- Audio tools
 
-    [FfmpegFact]
+    [FfmpegFact("flac")]
     public void Normalize_keeps_the_format_and_outputs_48khz()
     {
         string flac = Generate(At("voice.flac"), "-f", "lavfi", "-i", "sine=frequency=300:duration=2:sample_rate=44100");
@@ -133,7 +133,7 @@ public sealed class ToolTests : IDisposable
         Assert.Contains("48000 Hz", Describe(output));
     }
 
-    [FfmpegFact]
+    [FfmpegFact("pcm_s16le")]
     public void Mono_downmixes_stereo()
     {
         string wav = Generate(At("stereo.wav"), "-f", "lavfi", "-i", "sine=duration=1", "-ac", "2");
@@ -145,7 +145,7 @@ public sealed class ToolTests : IDisposable
         Assert.Contains("mono", Describe(output));
     }
 
-    [FfmpegFact]
+    [FfmpegFact("pcm_s16le", "libmp3lame")]
     public void Compress_audio_makes_a_128k_mp3()
     {
         string wav = Generate(At("song.wav"), "-f", "lavfi", "-i", "sine=duration=1");
@@ -156,7 +156,7 @@ public sealed class ToolTests : IDisposable
         Assert.Contains("128 kb/s", Describe(output));
     }
 
-    [FfmpegFact]
+    [FfmpegFact("libmp3lame")]
     public void Strip_audio_removes_tags_without_reencoding()
     {
         string mp3 = Generate(At("song.mp3"), "-f", "lavfi", "-i", "sine=duration=1", "-metadata", "title=Segredo");
@@ -171,7 +171,7 @@ public sealed class ToolTests : IDisposable
 
     // ---- Video tools
 
-    [FfmpegTheory]
+    [FfmpegTheory("libx264", "aac")]
     [InlineData(2000, 1200, 1800, 1080)] // Landscape: height capped.
     [InlineData(1200, 2000, 1080, 1800)] // Portrait: width (the short side) capped.
     [InlineData(640, 360, 640, 360)]     // Small: untouched.
@@ -187,7 +187,7 @@ public sealed class ToolTests : IDisposable
         AssertDecodes(output, "0:a:0");
     }
 
-    [FfmpegFact]
+    [FfmpegFact("libx264", "aac")]
     public void Rotate_video_swaps_dimensions()
     {
         string clip = Generate(At("clip.mp4"), "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=5:duration=1");
@@ -198,11 +198,11 @@ public sealed class ToolTests : IDisposable
         Assert.Equal((90, 160), VideoSize(output));
     }
 
-    [FfmpegFact]
+    [FfmpegFact("ffv1", "pcm_s16le")]
     public void Mute_keeps_the_container_and_drops_audio()
     {
         string clip = Generate(At("clip.mkv"), "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=5:duration=1",
-            "-f", "lavfi", "-i", "sine=duration=1", "-shortest");
+            "-f", "lavfi", "-i", "sine=duration=1", "-shortest", "-c:v", "ffv1", "-c:a", "pcm_s16le");
         Assert.Contains("Audio:", Describe(clip));
 
         string output = FileTools.Mute.Apply(clip, _options, Info, default);
@@ -212,7 +212,7 @@ public sealed class ToolTests : IDisposable
         AssertDecodes(output, "0:v:0");
     }
 
-    [FfmpegFact]
+    [FfmpegFact("libx264", "aac")]
     public void Strip_video_removes_tags_and_keeps_both_streams()
     {
         string clip = Generate(At("clip.mp4"), "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=5:duration=1",

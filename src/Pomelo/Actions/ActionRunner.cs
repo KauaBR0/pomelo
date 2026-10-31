@@ -26,6 +26,28 @@ internal sealed class ActionRunner
     private readonly MainWindow _main;
     private readonly CancellationToken _shutdown;
     private readonly IReadOnlyList<FileAction> _all;
+    private readonly List<Task> _backgroundWork = [];
+
+    /// <summary>Called after cancellation; wait only for background work, never for UI continuations.</summary>
+    public void WaitForShutdown()
+    {
+        try
+        {
+            Task.WhenAll(_backgroundWork).Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException)
+        {
+            // Cancellation or a transfer error; the action's own handler reports failures while running.
+        }
+    }
+
+    private async Task<T> InBackground<T>(Func<T> work)
+    {
+        Task<T> task = Task.Run(work, _shutdown);
+        _backgroundWork.Add(task);
+        try { return await task; }
+        finally { _backgroundWork.Remove(task); }
+    }
 
     public ActionRunner(Func<AppSettings> settings, Action<AppSettings> apply, TrayIcon tray, MainWindow main,
         CancellationToken shutdown)
@@ -71,10 +93,6 @@ internal sealed class ActionRunner
         {
             Notify("Falha", $"{action.HubText}: {ex.Message}", null);
         }
-        finally
-        {
-            _tray.SetStatus(null);
-        }
     }
 
     private Task CopyPathsAsync(IReadOnlyList<string> paths)
@@ -108,13 +126,14 @@ internal sealed class ActionRunner
             return;
         _apply(_settings() with { LastTransferFolder = folder });
 
-        _tray.SetStatus(mode == TransferMode.Copy ? "copiando…" : "movendo…");
-        var results = await Task.Run(() => FileTransfer.Run(paths, folder, mode, _shutdown), _shutdown);
+        using var status = _tray.BeginActionStatus(mode == TransferMode.Copy ? "copiando…" : "movendo…");
+        var results = await InBackground(() => FileTransfer.Run(paths, folder, mode, _shutdown));
         foreach (var r in results)
             _main.Report(new ConversionResult(r.Source, r.Destination, r.Error));
 
         var done = results.Where(r => r.Destination is not null).ToList();
-        var failed = results.Where(r => r.Error is not null).ToList();
+        var failed = results.Where(r => r.Destination is null).ToList();
+        var warnings = done.Where(r => r.Error is not null).ToList();
         string where = Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)) is { Length: > 0 } name ? name : folder;
         string past = mode == TransferMode.Copy ? "Copiado" : "Movido";
         (string title, string text) = (done.Count, failed.Count) switch
@@ -124,6 +143,11 @@ internal sealed class ActionRunner
             (0, 1) => ("Falha", $"{Path.GetFileName(failed[0].Source)}: {failed[0].Error}"),
             _ => ($"{done.Count} prontos, {failed.Count} com falha", "Abra o Pomelo para ver os detalhes."),
         };
+        if (warnings.Count > 0 && failed.Count == 0)
+        {
+            title = $"{done.Count} copiado(s), com aviso";
+            text = warnings.Count == 1 ? warnings[0].Error! : "Abra o Pomelo para ver os detalhes.";
+        }
         Notify(title, text, done.LastOrDefault()?.Destination);
     }
 
@@ -135,7 +159,7 @@ internal sealed class ActionRunner
         {
             var terminal = new ProcessStartInfo("wt.exe") { UseShellExecute = false };
             terminal.ArgumentList.Add("-d");
-            terminal.ArgumentList.Add(folder);
+            terminal.ArgumentList.Add(folder.Replace(";", "\\;"));
             Process.Start(terminal)?.Dispose();
         }
         catch (System.ComponentModel.Win32Exception)
@@ -150,8 +174,8 @@ internal sealed class ActionRunner
 
     private async Task CopyHashesAsync(IReadOnlyList<string> paths)
     {
-        _tray.SetStatus("calculando SHA-256…");
-        var hashes = await Task.Run(() => paths.Select(p => (p, Checksums.Sha256(p, _shutdown))).ToList(), _shutdown);
+        using var status = _tray.BeginActionStatus("calculando SHA-256…");
+        var hashes = await InBackground(() => paths.Select(p => (p, Checksums.Sha256(p, _shutdown))).ToList());
         SetClipboard(new Forms.DataObject(Forms.DataFormats.UnicodeText, Checksums.Format(hashes)));
         Notify("SHA-256 copiado", paths.Count == 1 ? $"{Path.GetFileName(paths[0])}: {hashes[0].Item2[..16]}…" : $"{paths.Count} arquivos", null);
     }

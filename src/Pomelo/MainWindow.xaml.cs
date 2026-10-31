@@ -138,7 +138,9 @@ internal sealed partial class MainWindow : Window
         string time = DateTime.Now.ToString("HH:mm:ss");
         var entry = result.Error is null
             ? new LogEntry($"{time}  ✓ {Path.GetFileName(result.Source)} → {result.Output}", result.Output)
-            : new LogEntry($"{time}  ✗ {Path.GetFileName(result.Source)}: {result.Error}", result.Source);
+            : result.Output is not null
+                ? new LogEntry($"{time}  Aviso: {Path.GetFileName(result.Source)} → {result.Output}: {result.Error}", result.Output)
+                : new LogEntry($"{time}  ✗ {Path.GetFileName(result.Source)}: {result.Error}", result.Source);
         Log.Items.Insert(0, entry);
     }
 

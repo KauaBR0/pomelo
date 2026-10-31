@@ -29,6 +29,7 @@ public partial class App : Application
     private AppSettings _settings = null!;
     private GestureMonitor? _gestures;
     private ConversionWorker? _worker;
+    private ActionRunner? _actions;
     private TrayIcon? _tray;
     private WheelWindow _wheel = null!;
     private MainWindow _main = null!;
@@ -66,9 +67,9 @@ public partial class App : Application
         _wheel.Ffmpeg = () => _ffmpeg;
         _wheel.OperationRequested += (paths, operation) => _worker.Enqueue(new ConversionBatch(paths, operation,
             new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality), _ffmpeg));
-        var actions = new ActionRunner(() => _settings, Apply, _tray, _main, _shutdown.Token);
-        _wheel.Actions = actions.For;
-        _wheel.ActionRequested += (paths, action) => actions.Run(action, paths);
+        _actions = new ActionRunner(() => _settings, Apply, _tray, _main, _shutdown.Token);
+        _wheel.Actions = _actions.For;
+        _wheel.ActionRequested += (paths, action) => _actions.Run(action, paths);
         _worker.FileStarted += (path, index, count) =>
             _tray.SetStatus(count == 1 ? $"processando {Path.GetFileName(path)}" : $"processando {Path.GetFileName(path)} ({index}/{count})");
         _worker.FileCompleted += _main.Report;
@@ -193,7 +194,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _shutdown.Cancel(); // Stops copy/move/hash work between files.
+        _shutdown.Cancel();
+        _actions?.WaitForShutdown();
         _activateWait?.Unregister(null);
         _tray?.Dispose();
         _gestures?.Dispose();

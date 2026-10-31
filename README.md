@@ -68,7 +68,11 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 | Compartilhar | Abre o painel Compartilhar do Windows (Compartilhamento por Proximidade, WhatsApp, e-mail…); só arquivos |
 | SHA-256 | Copia o hash; para vários arquivos, no formato do `sha256sum`; só arquivos |
 
-"Copiar em…" e "Mover…" lembram a última pasta usada, nunca substituem nada (um nome já usado vira `nome (1)`) e não colocam uma pasta dentro dela mesma.
+"Copiar em…" e "Mover…" lembram a última pasta usada, nunca substituem nada (um nome já usado vira `nome (1)`) e não colocam uma pasta dentro dela mesma, inclusive por junções ou aliases de disco.
+
+- Cópias são montadas como `~pomelo-….part` e só recebem o nome final quando completas. Ao sair, o app cancela a cópia e aguarda sua limpeza por até 5 segundos; um encerramento forçado pode deixar um `.part`, mas não uma cópia incompleta com aparência de concluída.
+- Mover a raiz de um disco é recusado. Entre discos, a origem só é removida depois da cópia completa; se não for possível apagá-la, o destino é mantido e aparece um **aviso**, com o caminho da cópia.
+- Junções e links de pastas dentro de uma cópia são ignorados com aviso. Mover uma árvore com esses links entre discos é recusado; use o Explorer nesse caso.
 
 ## Formatos
 
@@ -82,7 +86,7 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 
 - Fotos de celular são giradas conforme a orientação EXIF, então não saem deitadas.
 - Em JPG, BMP e GIF (sem transparência), áreas transparentes viram fundo branco. GIF usa uma paleta otimizada de 256 cores.
-- O perfil de cor é preservado em JPG, PNG e TIFF; em BMP e GIF, a imagem é convertida para sRGB.
+- Perfis RGB são preservados em JPG, PNG e TIFF. Imagens CMYK/cinza com perfil, e saídas BMP/GIF, são convertidas para sRGB; o perfil de origem não é anexado a pixels de outro espaço de cor.
 - GIF animado e TIFF com várias páginas ainda não são suportados: o Pomelo recusa com uma mensagem, em vez de descartar quadros em silêncio.
 
 ### Áudio e vídeo (requer FFmpeg)
@@ -97,6 +101,7 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 
 - Usa o primeiro fluxo de vídeo e o primeiro de áudio; legendas e capas embutidas não são copiadas.
 - Vídeos com largura ou altura ímpar são ajustados em 1 pixel (exigência do H.264). GIF animado sai com 12 fps e no máximo 640 px de largura.
+- WMA e WMV saem com áudio estéreo, inclusive quando a entrada tem som surround (5.1 ou mais canais).
 - Só aparecem os formatos que o FFmpeg instalado consegue gerar.
 - O FFmpeg roda com prioridade baixa, para não travar o computador. Durante a conversão, passe o mouse no ícone da bandeja para ver o andamento. Enquanto converte, existe um arquivo temporário `~pomelo-….part` na pasta de saída, apagado em caso de falha ou ao sair do Pomelo.
 
@@ -145,7 +150,7 @@ Testes:
 dotnet test
 ```
 
-Os testes de áudio e vídeo rodam o FFmpeg de verdade e são pulados se ele não for encontrado.
+Os testes de áudio e vídeo rodam o FFmpeg de verdade e são pulados se ele ou os codificadores exigidos pelo teste não estiverem disponíveis.
 
 ### Desinstalar
 

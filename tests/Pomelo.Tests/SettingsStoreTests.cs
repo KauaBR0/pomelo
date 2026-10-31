@@ -49,6 +49,23 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(new AppSettings(), new SettingsStore(FilePath).Load());
     }
 
+    [Fact]
+    public void Locked_settings_load_defaults_without_changing_the_file()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        File.WriteAllText(FilePath, """{ "JpegQuality": 70 }""");
+        using (File.Open(FilePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.Equal(new AppSettings(), new SettingsStore(FilePath).Load());
+        Assert.Equal(70, new SettingsStore(FilePath).Load().JpegQuality);
+    }
+
+    [Fact]
+    public void A_directory_at_the_settings_path_loads_defaults()
+    {
+        Directory.CreateDirectory(FilePath);
+        Assert.Equal(new AppSettings(), new SettingsStore(FilePath).Load());
+    }
+
     [Theory]
     [InlineData(0, 1)]
     [InlineData(250, 100)]

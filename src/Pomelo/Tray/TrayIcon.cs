@@ -14,6 +14,18 @@ internal sealed class TrayIcon : IDisposable
     private readonly Forms.ToolStripMenuItem _wheelItem;
     private readonly System.Drawing.Icon _image;
     private string? _notificationRevealPath;
+    private string? _conversionStatus;
+    private readonly List<ActionStatus> _actionStatuses = [];
+
+    private sealed class ActionStatus(TrayIcon owner, string text) : IDisposable
+    {
+        public string Text { get; } = text;
+        public void Dispose()
+        {
+            owner._actionStatuses.Remove(this);
+            owner.RefreshStatus();
+        }
+    }
 
     public TrayIcon()
     {
@@ -47,9 +59,24 @@ internal sealed class TrayIcon : IDisposable
 
     public void SetWheelEnabled(bool enabled) => _wheelItem.Checked = enabled;
 
-    /// <summary>Tooltip suffix while working, e.g. "convertendo video.mp4 (1/3)"; null restores "Pomelo".</summary>
+    /// <summary>Conversion progress remains available while independent actions run.</summary>
     public void SetStatus(string? status)
     {
+        _conversionStatus = status;
+        RefreshStatus();
+    }
+
+    public IDisposable BeginActionStatus(string text)
+    {
+        var status = new ActionStatus(this, text);
+        _actionStatuses.Add(status);
+        RefreshStatus();
+        return status;
+    }
+
+    private void RefreshStatus()
+    {
+        string? status = _actionStatuses.LastOrDefault()?.Text ?? _conversionStatus;
         string text = status is null ? "Pomelo" : $"Pomelo — {status}";
         _icon.Text = text.Length <= 127 ? text : text[..126] + "…"; // NotifyIcon limit.
     }

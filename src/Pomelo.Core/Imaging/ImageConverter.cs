@@ -34,7 +34,16 @@ public static class ImageConverter
         if (!Directory.Exists(directory))
             throw new ConversionException($"A pasta de saída não existe: {directory}");
 
-        BitmapSource image = transform(Load(sourcePath, out var colorContexts));
+        BitmapSource image = Load(sourcePath, out var colorContexts);
+
+        // Decide using the decoded color model, before transforms can change its pixel format.
+        bool embedsProfile = target == ImageFormats.Jpeg || target == ImageFormats.Png || target == ImageFormats.Tiff;
+        if (colorContexts is { Count: > 0 } && (!embedsProfile || !IsRgb(image.Format)))
+        {
+            image = ToSrgb(image, colorContexts[0]);
+            colorContexts = null;
+        }
+        image = transform(image);
 
         BitmapEncoder encoder = target switch
         {
@@ -49,13 +58,6 @@ public static class ImageConverter
             _ => throw new ArgumentOutOfRangeException(nameof(target), target.Name, "Formato de saída desconhecido."),
         };
 
-        // PNG/JPEG/TIFF can embed the source ICC profile; BMP/GIF cannot, so convert those to sRGB.
-        bool embedsProfile = target == ImageFormats.Jpeg || target == ImageFormats.Png || target == ImageFormats.Tiff;
-        if (!embedsProfile && colorContexts is { Count: > 0 })
-        {
-            image = new ColorConvertedBitmap(image, colorContexts[0], new ColorContext(PixelFormats.Bgra32), PixelFormats.Bgra32);
-            colorContexts = null;
-        }
 
         if (target == ImageFormats.Jpeg || target == ImageFormats.Bmp)
             image = FlattenOnWhite(image);
@@ -68,6 +70,27 @@ public static class ImageConverter
         encoder.Save(buffer);
 
         return UniqueFileWriter.Write(directory, outputName, target.Extension, buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+    }
+
+    private static bool IsRgb(PixelFormat format) =>
+        format != PixelFormats.Cmyk32 && format != PixelFormats.BlackWhite
+        && format != PixelFormats.Gray2 && format != PixelFormats.Gray4 && format != PixelFormats.Gray8
+        && format != PixelFormats.Gray16 && format != PixelFormats.Gray32Float;
+
+    /// <summary>Convert to sRGB without silently discarding an unsupported source profile.</summary>
+    private static BitmapSource ToSrgb(BitmapSource image, ColorContext profile)
+    {
+        try
+        {
+            // ColorConvertedBitmap rejects palettes; expand RGB indices, not CMYK/gray samples.
+            BitmapSource input = image.Palette is not null
+                ? new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0) : image;
+            return new ColorConvertedBitmap(input, profile, new ColorContext(PixelFormats.Bgra32), PixelFormats.Bgra32);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or ArgumentException or COMException)
+        {
+            throw new ConversionException("O Windows não consegue converter o perfil de cor desta imagem para sRGB.", ex);
+        }
     }
 
     /// <summary>Scales so the longer side is at most <paramref name="maxSide"/> pixels; never enlarges.</summary>

@@ -12,4 +12,8 @@
     <!-- WPF SDK leaves System.IO out of implicit usings. -->
     <Using Include="System.IO" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pomelo.Tests" />
+  </ItemGroup>
 </Project>

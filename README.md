@@ -2,6 +2,19 @@
 
 Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma imagem, música ou vídeo no Explorer, toque **Shift** e solte sobre o formato desejado; **Ctrl** traz ferramentas como reduzir, girar e comprimir, e **Alt** traz ações como copiar o caminho, mover e compartilhar. Tudo roda localmente; nenhum arquivo sai do seu computador.
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/wheel-convert.png" width="240" alt="Roda de conversão: JPG, PNG, TIFF, BMP e GIF, com JPG em destaque"></td>
+    <td align="center"><img src="docs/images/wheel-tools.png" width="240" alt="Roda de ferramentas: 50%, girar, limpar e comprimir, com 50% em destaque"></td>
+    <td align="center"><img src="docs/images/wheel-actions.png" width="240" alt="Roda de ações: caminho, copiar, copiar em, mover, terminal, compartilhar e SHA-256, com Compartilhar em destaque"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Shift</b> · converter</td>
+    <td align="center"><b>Ctrl</b> · ferramentas</td>
+    <td align="center"><b>Alt</b> · ações</td>
+  </tr>
+</table>
+
 Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac. Projeto independente, sem relação com o Tangerine.
 
 > **Estado:** em desenvolvimento. Converte imagens, áudio e vídeo; PDF e documentos ainda não.
@@ -102,6 +115,8 @@ winget install --id Gyan.FFmpeg.Essentials --exact
 ## Configurações
 
 Clique no ícone da bandeja para abrir a janela:
+
+<p align="center"><img src="docs/images/settings.png" width="460" alt="Janela de configurações do Pomelo"></p>
 
 - **Rodas:** ligar/desligar, e a tecla de cada roda: conversão, ferramentas e ações (Shift, Ctrl ou Alt; escolher a tecla de outra roda troca as duas).
 - **Arquivos convertidos:** ao lado do original, em Downloads, na Área de Trabalho ou numa pasta escolhida. Qualidade do JPEG.

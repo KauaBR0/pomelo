@@ -76,7 +76,7 @@ internal sealed class WheelView : FrameworkElement
         double labelRadius = (InnerRadius + outer) / 2;
         // Horizontal room is the sector's chord near the top/bottom and the ring's thickness at the
         // sides; the smaller of the two keeps every label inside its sector.
-        double maxLabelWidth = 0.95 * Math.Min(outer - InnerRadius,
+        double maxLabelWidth = 0.88 * Math.Min(outer - InnerRadius,
             n <= 2 ? double.MaxValue : 2 * labelRadius * Math.Sin(sweep / 2 * Math.PI / 180));
         for (int i = 0; i < n; i++)
         {

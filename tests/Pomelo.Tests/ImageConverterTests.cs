@@ -76,6 +76,39 @@ public sealed class ImageConverterTests : IDisposable
     }
 
     [Fact]
+    public void Output_directory_option_is_used_and_keeps_the_original_name()
+    {
+        string png = SavePng("vacation.png", 4, 4, (_, _) => 0xFF00FF00u);
+        string elsewhere = Directory.CreateDirectory(Path.Combine(_dir, "out")).FullName;
+
+        string output = ImageConverter.Convert(png, ImageFormats.Jpeg, new ConversionOptions(elsewhere));
+
+        Assert.Equal(Path.Combine(elsewhere, "vacation.jpg"), output);
+    }
+
+    [Fact]
+    public void Missing_output_directory_fails_without_writing_anything()
+    {
+        string png = SavePng("a.png", 4, 4, (_, _) => 0xFF00FF00u);
+
+        Assert.Throws<ConversionException>(() =>
+            ImageConverter.Convert(png, ImageFormats.Jpeg, new ConversionOptions(Path.Combine(_dir, "gone"))));
+        Assert.Equal([png], Directory.GetFiles(_dir));
+    }
+
+    [Fact]
+    public void Jpeg_quality_option_changes_the_encoding()
+    {
+        var noise = new Random(7);
+        string png = SavePng("noise.png", 128, 128, (_, _) => 0xFF000000u | (uint)noise.Next(0x1000000));
+
+        long low = new FileInfo(ImageConverter.Convert(png, ImageFormats.Jpeg, new ConversionOptions(JpegQuality: 20))).Length;
+        long high = new FileInfo(ImageConverter.Convert(png, ImageFormats.Jpeg, new ConversionOptions(JpegQuality: 95))).Length;
+
+        Assert.True(low * 2 < high, $"quality 20 = {low} bytes, quality 95 = {high} bytes");
+    }
+
+    [Fact]
     public void Multi_page_input_is_rejected_without_writing_anything()
     {
         var encoder = new TiffBitmapEncoder();

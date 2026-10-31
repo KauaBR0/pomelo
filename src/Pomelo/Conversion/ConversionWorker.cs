@@ -8,6 +8,8 @@ namespace Pomelo.Conversion;
 
 internal sealed record ConversionResult(string Source, string? Output, string? Error);
 
+internal sealed record ConversionBatch(IReadOnlyList<string> Paths, ImageFormat Target, ConversionOptions Options);
+
 /// <summary>
 /// Runs conversions one file at a time on a dedicated STA thread (WPF imaging is
 /// thread-affine), so the wheel and input hooks never wait on encoding.
@@ -15,10 +17,13 @@ internal sealed record ConversionResult(string Source, string? Output, string? E
 /// </summary>
 internal sealed class ConversionWorker : IDisposable
 {
-    public event Action<ConversionResult>? Completed;
+    /// <summary>Raised on the UI thread after each file.</summary>
+    public event Action<ConversionResult>? FileCompleted;
+    /// <summary>Raised on the UI thread once every file of a batch is done.</summary>
+    public event Action<ConversionBatch, IReadOnlyList<ConversionResult>>? BatchCompleted;
 
     private readonly Dispatcher _dispatcher;
-    private readonly BlockingCollection<(string Path, ImageFormat Target)> _queue = new();
+    private readonly BlockingCollection<ConversionBatch> _queue = new();
     private readonly Thread _thread;
 
     public ConversionWorker(Dispatcher dispatcher)
@@ -29,27 +34,29 @@ internal sealed class ConversionWorker : IDisposable
         _thread.Start();
     }
 
-    public void Enqueue(IEnumerable<string> paths, ImageFormat target)
-    {
-        foreach (string path in paths)
-            _queue.Add((path, target));
-    }
+    public void Enqueue(ConversionBatch batch) => _queue.Add(batch);
 
     private void Run()
     {
-        foreach (var (path, target) in _queue.GetConsumingEnumerable())
+        foreach (var batch in _queue.GetConsumingEnumerable())
         {
-            ConversionResult result;
-            try
+            var results = new List<ConversionResult>(batch.Paths.Count);
+            foreach (string path in batch.Paths)
             {
-                result = new(path, ImageConverter.Convert(path, target), null);
+                ConversionResult result;
+                try
+                {
+                    result = new(path, ImageConverter.Convert(path, batch.Target, batch.Options), null);
+                }
+                catch (Exception ex)
+                {
+                    // Per-file isolation: a corrupt or huge input must not take down the batch or the app.
+                    result = new(path, null, ex is ConversionException ? ex.Message : $"{ex.GetType().Name}: {ex.Message}");
+                }
+                results.Add(result);
+                _dispatcher.BeginInvoke(() => FileCompleted?.Invoke(result));
             }
-            catch (Exception ex)
-            {
-                // Per-file isolation: a corrupt or huge input must not take down the batch or the app.
-                result = new(path, null, ex is ConversionException ? ex.Message : $"{ex.GetType().Name}: {ex.Message}");
-            }
-            _dispatcher.BeginInvoke(() => Completed?.Invoke(result));
+            _dispatcher.BeginInvoke(() => BatchCompleted?.Invoke(batch, results));
         }
     }
 

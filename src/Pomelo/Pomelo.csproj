@@ -6,11 +6,20 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- Only for NotifyIcon (tray), which handles Explorer restarts and balloon/toast plumbing. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Pomelo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Using Include="System.IO" />
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Pomelo.ico" />
   </ItemGroup>
 
   <ItemGroup>

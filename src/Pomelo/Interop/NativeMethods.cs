@@ -20,8 +20,14 @@ internal static class NativeMethods
 
     public const int VK_ESCAPE = 0x1B;
     public const int VK_SHIFT = 0x10;
+    public const int VK_CONTROL = 0x11;
+    public const int VK_MENU = 0x12;
     public const int VK_LSHIFT = 0xA0;
     public const int VK_RSHIFT = 0xA1;
+    public const int VK_LCONTROL = 0xA2;
+    public const int VK_RCONTROL = 0xA3;
+    public const int VK_LMENU = 0xA4;
+    public const int VK_RMENU = 0xA5;
 
     public const int SM_CXDRAG = 68;
     public const int SM_CYDRAG = 69;
@@ -132,4 +138,15 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+}
+
+internal static class ForegroundRights
+{
+    private const int ASFW_ANY = -1;
+
+    /// <summary>Lets the already-running instance bring its window to the front when we signal it.</summary>
+    public static void GrantToAnyProcess() => AllowSetForegroundWindow(ASFW_ANY);
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int processId);
 }

@@ -1,3 +1,4 @@
+using Pomelo.Core.Settings;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
@@ -15,13 +16,21 @@ namespace Pomelo.Core.Imaging;
 public static class ImageConverter
 {
     /// <returns>The path of the created file.</returns>
-    public static string Convert(string sourcePath, ImageFormat target, string? outputDirectory = null)
+    public static string Convert(string sourcePath, ImageFormat target, ConversionOptions? options = null)
     {
+        options ??= new ConversionOptions();
+        string directory = options.OutputDirectory ?? Path.GetDirectoryName(Path.GetFullPath(sourcePath))!;
+        if (!Directory.Exists(directory))
+            throw new ConversionException($"A pasta de saída não existe: {directory}");
+
         BitmapSource image = Load(sourcePath, out var colorContexts);
 
         BitmapEncoder encoder = target switch
         {
-            _ when target == ImageFormats.Jpeg => new JpegBitmapEncoder { QualityLevel = 92 },
+            _ when target == ImageFormats.Jpeg => new JpegBitmapEncoder
+            {
+                QualityLevel = Math.Clamp(options.JpegQuality, AppSettings.MinJpegQuality, AppSettings.MaxJpegQuality),
+            },
             _ when target == ImageFormats.Png => new PngBitmapEncoder(),
             _ when target == ImageFormats.Tiff => new TiffBitmapEncoder { Compression = TiffCompressOption.Lzw },
             _ when target == ImageFormats.Bmp => new BmpBitmapEncoder(),
@@ -47,7 +56,6 @@ public static class ImageConverter
         using var buffer = new MemoryStream();
         encoder.Save(buffer);
 
-        string directory = outputDirectory ?? Path.GetDirectoryName(Path.GetFullPath(sourcePath))!;
         return UniqueFileWriter.Write(directory, Path.GetFileNameWithoutExtension(sourcePath), target.Extension,
             buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
     }

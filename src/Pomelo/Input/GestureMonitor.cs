@@ -1,19 +1,20 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using Pomelo.Core.Settings;
 using static Pomelo.Interop.NativeMethods;
 
 namespace Pomelo.Input;
 
 /// <summary>
-/// Detects "mouse button held + moved past the drag threshold, then Shift pressed" anywhere
-/// on the desktop. Hooks live on a dedicated thread so a busy UI thread never delays system
-/// input (Windows silently removes low-level hooks that respond slowly). Input is observed,
-/// never consumed or recorded. Events are raised on the UI dispatcher.
+/// Detects "mouse button held + moved past the drag threshold, then the trigger key pressed"
+/// anywhere on the desktop. Hooks live on a dedicated thread so a busy UI thread never delays
+/// system input (Windows silently removes low-level hooks that respond slowly). Input is
+/// observed, never consumed or recorded. Events are raised on the UI dispatcher.
 /// </summary>
 internal sealed class GestureMonitor : IDisposable
 {
-    /// <summary>Shift was pressed during a drag. The wheel should appear under the cursor.</summary>
+    /// <summary>The trigger key was pressed during a drag. The wheel should appear under the cursor.</summary>
     public event Action? WheelRequested;
     /// <summary>The mouse button was released after a wheel request.</summary>
     public event Action? GestureEnded;
@@ -22,18 +23,21 @@ internal sealed class GestureMonitor : IDisposable
 
     public bool Enabled { get => _enabled; set => _enabled = value; }
 
+    public TriggerKey TriggerKey { get => (TriggerKey)_triggerKey; set => _triggerKey = (int)value; }
+
     private readonly Dispatcher _dispatcher;
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _ready = new();
     private Exception? _startError;
     private uint _threadId;
     private volatile bool _enabled = true;
+    private volatile int _triggerKey = (int)TriggerKey.Shift;
 
     // Hook-thread state only.
     private LowLevelHookProc? _mouseProc, _keyboardProc; // Rooted: native code holds these.
     private IntPtr _mouseHook, _keyboardHook;
     private int _dragDx, _dragDy;
-    private bool _buttonDown, _dragging, _shiftDown, _wheelRequested;
+    private bool _buttonDown, _dragging, _triggerDown, _wheelRequested;
     private POINT _downPoint;
 
     public GestureMonitor(Dispatcher dispatcher)
@@ -110,15 +114,15 @@ internal sealed class GestureMonitor : IDisposable
         {
             var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             bool down = (int)wParam is WM_KEYDOWN or WM_SYSKEYDOWN;
-            if (info.vkCode is VK_SHIFT or VK_LSHIFT or VK_RSHIFT)
+            if (IsTrigger(info.vkCode))
             {
                 // Key repeat sends repeated key-downs; react to the first one only.
-                if (down && !_shiftDown && _dragging && !_wheelRequested && _enabled)
+                if (down && !_triggerDown && _dragging && !_wheelRequested && _enabled)
                 {
                     _wheelRequested = true;
                     Raise(WheelRequested);
                 }
-                _shiftDown = down;
+                _triggerDown = down;
             }
             else if (down && info.vkCode == VK_ESCAPE && _wheelRequested)
             {
@@ -128,6 +132,13 @@ internal sealed class GestureMonitor : IDisposable
         }
         return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
     }
+
+    private bool IsTrigger(uint vk) => (TriggerKey)_triggerKey switch
+    {
+        TriggerKey.Ctrl => vk is VK_CONTROL or VK_LCONTROL or VK_RCONTROL,
+        TriggerKey.Alt => vk is VK_MENU or VK_LMENU or VK_RMENU,
+        _ => vk is VK_SHIFT or VK_LSHIFT or VK_RSHIFT,
+    };
 
     private void Raise(Action? handler)
     {

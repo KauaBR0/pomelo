@@ -15,16 +15,21 @@ public sealed record AppSettings
     public const int MaxJpegQuality = 100;
 
     public bool WheelEnabled { get; init; } = true;
-    /// <summary>Opens the conversion wheel. Always differs from <see cref="ToolsKey"/>.</summary>
+    // The three wheel keys are always distinct (enforced by SettingsStore and the settings UI).
+    /// <summary>Opens the conversion wheel.</summary>
     public WheelKey ConvertKey { get; init; } = WheelKey.Shift;
-    /// <summary>Opens the tools wheel. Always differs from <see cref="ConvertKey"/>.</summary>
+    /// <summary>Opens the tools wheel.</summary>
     public WheelKey ToolsKey { get; init; } = WheelKey.Ctrl;
+    /// <summary>Opens the actions wheel.</summary>
+    public WheelKey ActionsKey { get; init; } = WheelKey.Alt;
     public OutputLocation OutputLocation { get; init; } = OutputLocation.BesideOriginal;
     public string? CustomOutputFolder { get; init; }
     public int JpegQuality { get; init; } = 92;
     public bool NotifyOnCompletion { get; init; } = true;
     /// <summary>ffmpeg.exe chosen by the user; null searches the usual places.</summary>
     public string? FfmpegPath { get; init; }
+    /// <summary>Last folder picked by "Copiar em…" / "Mover…"; the next picker starts there.</summary>
+    public string? LastTransferFolder { get; init; }
     /// <summary>The "still running in the tray" hint is shown once, the first time the window is closed.</summary>
     public bool TrayHintShown { get; init; }
 }

@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using Pomelo.Core.Conversion;
 using Pomelo.Core.Media;
 using Pomelo.Core.Tools;
+using Pomelo.Actions;
 using static Pomelo.Interop.NativeMethods;
 
 namespace Pomelo.Wheel;
@@ -22,14 +23,21 @@ internal sealed partial class WheelWindow : Window
 
     /// <summary>Raised after the wheel closes, with the dropped files and the chosen conversion or tool.</summary>
     public event Action<IReadOnlyList<string>, IFileOperation>? OperationRequested;
+    /// <summary>Raised after the wheel closes, with the dropped items and the chosen action.</summary>
+    public event Action<IReadOnlyList<string>, FileAction>? ActionRequested;
 
     /// <summary>Current FFmpeg, read when files enter the wheel; null hides audio/video targets.</summary>
     public Func<FfmpegInfo?> Ffmpeg { get; set; } = () => null;
+    /// <summary>Actions offered for the dropped items.</summary>
+    public Func<IReadOnlyList<string>, IReadOnlyList<FileAction>> Actions { get; set; } = _ => [];
+
+    /// <summary>One sector: its text and what dropping on it does.</summary>
+    private sealed record WheelItem(string Label, string HubText, Action<IReadOnlyList<string>> Execute);
 
     private readonly IntPtr _hwnd;
     private readonly DispatcherTimer _hideTimer;
     private IReadOnlyList<string> _paths = [];
-    private IReadOnlyList<IFileOperation> _operations = [];
+    private IReadOnlyList<WheelItem> _items = [];
     private string? _hint;
     private bool _revealed;
     private WheelMode _mode;
@@ -67,7 +75,7 @@ internal sealed partial class WheelWindow : Window
         _mode = mode;
         _inGesture = true;
         _paths = [];
-        _operations = [];
+        _items = [];
         _hint = null;
         _revealed = false;
         View.Labels = [];
@@ -155,24 +163,37 @@ internal sealed partial class WheelWindow : Window
 
     private void LoadOperations()
     {
-        if (_mode == WheelMode.Convert)
+        switch (_mode)
         {
-            var choices = ConversionCatalog.For(_paths, Ffmpeg());
-            _operations = choices.Targets.Select(t => (IFileOperation)new ConvertOperation(t)).ToList();
-            _hint = choices.Hint;
+            case WheelMode.Convert:
+                var conversions = ConversionCatalog.For(_paths, Ffmpeg());
+                _items = FromOperations(conversions.Targets.Select(t => new ConvertOperation(t)));
+                _hint = conversions.Hint;
+                break;
+            case WheelMode.Tools:
+                var tools = ToolCatalog.For(_paths, Ffmpeg());
+                _items = FromOperations(tools.Tools);
+                _hint = tools.Hint;
+                break;
+            default:
+                _items = Actions(_paths).Select(a => new WheelItem(a.Label, a.HubText, p => ActionRequested?.Invoke(p, a))).ToList();
+                _hint = null;
+                break;
         }
-        else
+        View.Highlight = _mode switch
         {
-            var choices = ToolCatalog.For(_paths, Ffmpeg());
-            _operations = choices.Tools;
-            _hint = choices.Hint;
-        }
-        View.Highlight = _mode == WheelMode.Convert ? WheelView.ConvertAccent : WheelView.ToolsAccent;
-        View.Labels = _operations.Select(o => o.Label).ToList();
+            WheelMode.Convert => WheelView.ConvertAccent,
+            WheelMode.Tools => WheelView.ToolsAccent,
+            _ => WheelView.ActionsAccent,
+        };
+        View.Labels = _items.Select(i => i.Label).ToList();
         ShowHover(-1);
-        if (_operations.Count == 0)
+        if (_items.Count == 0)
             HideAfter(NoTargetsLinger);
     }
+
+    private List<WheelItem> FromOperations(IEnumerable<IFileOperation> operations) =>
+        operations.Select(o => new WheelItem(o.Label, o.HubText, paths => OperationRequested?.Invoke(paths, o))).ToList();
 
     private void UpdateHover(DragEventArgs e)
     {
@@ -187,10 +208,12 @@ internal sealed partial class WheelWindow : Window
     private void ShowHover(int sector)
     {
         View.Hover = sector;
-        string title = _paths.Count == 1 ? "1 arquivo" : $"{_paths.Count} arquivos";
-        string subtitle = sector >= 0 ? _operations[sector].HubText
-            : _operations.Count > 0 ? (_mode == WheelMode.Convert ? "Converter para…" : "Ferramentas")
-            : _hint ?? (_mode == WheelMode.Convert ? "Sem conversões" : "Sem ferramentas");
+        string title = _paths.Count == 1
+            ? (Directory.Exists(_paths[0]) ? "1 pasta" : "1 arquivo")
+            : (_paths.Any(Directory.Exists) ? $"{_paths.Count} itens" : $"{_paths.Count} arquivos");
+        string subtitle = sector >= 0 ? _items[sector].HubText
+            : _items.Count > 0 ? _mode switch { WheelMode.Convert => "Converter para…", WheelMode.Tools => "Ferramentas", _ => "Ações" }
+            : _hint ?? _mode switch { WheelMode.Convert => "Sem conversões", WheelMode.Tools => "Sem ferramentas", _ => "Sem ações" };
         View.SetHub(title, subtitle);
     }
 
@@ -201,12 +224,12 @@ internal sealed partial class WheelWindow : Window
         {
             e.Effects = DragDropEffects.Copy;
             var paths = _paths;
-            var operation = _operations[sector];
+            var item = _items[sector];
             // Return from Drop immediately: the drag source (Explorer) is blocked until we do.
             Dispatcher.BeginInvoke(() =>
             {
                 Dismiss();
-                OperationRequested?.Invoke(paths, operation);
+                item.Execute(paths);
             });
         }
         else

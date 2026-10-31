@@ -11,7 +11,7 @@ public static class UniqueFileWriter
     /// <returns>The path written.</returns>
     public static string Write(string directory, string baseName, string extension, ReadOnlySpan<byte> content)
     {
-        foreach (string path in Names(directory, baseName, extension))
+        foreach (string path in Candidates(directory, baseName, extension))
         {
             FileStream stream;
             try
@@ -42,7 +42,7 @@ public static class UniqueFileWriter
     /// <returns>The final path.</returns>
     public static string MoveIntoPlace(string tempPath, string directory, string baseName, string extension)
     {
-        foreach (string path in Names(directory, baseName, extension))
+        foreach (string path in Candidates(directory, baseName, extension))
         {
             try
             {
@@ -56,7 +56,8 @@ public static class UniqueFileWriter
         throw new UnreachableException();
     }
 
-    private static IEnumerable<string> Names(string directory, string baseName, string extension)
+    /// <summary>"name.ext", "name (1).ext", … skipping names that already exist (files or folders).</summary>
+    internal static IEnumerable<string> Candidates(string directory, string baseName, string extension)
     {
         for (int n = 0; ; n++)
         {
@@ -66,5 +67,6 @@ public static class UniqueFileWriter
         }
     }
 
-    private static bool IsTaken(IOException ex) => ex.HResult is ErrorFileExists or ErrorAlreadyExists;
+    /// <summary>The target was created by someone else between the existence check and the write.</summary>
+    internal static bool IsTaken(IOException ex) => ex.HResult is ErrorFileExists or ErrorAlreadyExists;
 }

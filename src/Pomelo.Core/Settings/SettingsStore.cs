@@ -30,16 +30,26 @@ public sealed class SettingsStore(string path)
         }
 
         settings ??= new AppSettings();
-        var convertKey = Enum.IsDefined(settings.ConvertKey) ? settings.ConvertKey : WheelKey.Shift;
-        var toolsKey = Enum.IsDefined(settings.ToolsKey) ? settings.ToolsKey : WheelKey.Ctrl;
-        if (toolsKey == convertKey)
-            toolsKey = Enum.GetValues<WheelKey>().First(k => k != convertKey);
+        // Invalid keys fall back to their defaults; duplicates keep the earlier wheel's key and the
+        // later wheel takes a free one, so each wheel always has its own key.
+        WheelKey[] wanted =
+        [
+            Enum.IsDefined(settings.ConvertKey) ? settings.ConvertKey : WheelKey.Shift,
+            Enum.IsDefined(settings.ToolsKey) ? settings.ToolsKey : WheelKey.Ctrl,
+            Enum.IsDefined(settings.ActionsKey) ? settings.ActionsKey : WheelKey.Alt,
+        ];
+        var free = new Queue<WheelKey>(Enum.GetValues<WheelKey>().Except(wanted));
+        var keys = new WheelKey[wanted.Length];
+        for (int i = 0; i < wanted.Length; i++)
+            keys[i] = keys[..i].Contains(wanted[i]) ? free.Dequeue() : wanted[i];
+
         return settings with
         {
             JpegQuality = Math.Clamp(settings.JpegQuality, AppSettings.MinJpegQuality, AppSettings.MaxJpegQuality),
             OutputLocation = Enum.IsDefined(settings.OutputLocation) ? settings.OutputLocation : OutputLocation.BesideOriginal,
-            ConvertKey = convertKey,
-            ToolsKey = toolsKey,
+            ConvertKey = keys[0],
+            ToolsKey = keys[1],
+            ActionsKey = keys[2],
         };
     }
 

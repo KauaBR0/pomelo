@@ -9,11 +9,14 @@ internal sealed class WheelView : FrameworkElement
 {
     private const double OuterInset = 8;
     private const double InnerRadius = 70;
+    private const double LabelSize = 17;
+    private const double MinLabelSize = 11;
 
     private static readonly Brush RingFill = Frozen(new SolidColorBrush(Color.FromArgb(0xF2, 0x1C, 0x1C, 0x1E)));
     private static readonly Brush HubFill = Frozen(new SolidColorBrush(Color.FromArgb(0xF7, 0x2A, 0x2A, 0x2D)));
     public static readonly Brush ConvertAccent = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x1F)));
     public static readonly Brush ToolsAccent = Frozen(new SolidColorBrush(Color.FromRgb(0x3C, 0xC7, 0xB5)));
+    public static readonly Brush ActionsAccent = Frozen(new SolidColorBrush(Color.FromRgb(0xA9, 0x8B, 0xFF)));
     private static readonly Brush Text = Brushes.White;
     private static readonly Brush MutedText = Frozen(new SolidColorBrush(Color.FromArgb(0xB0, 0xFF, 0xFF, 0xFF)));
     private static readonly Pen Edge = Frozen(new Pen(Frozen(new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF))), 1));
@@ -70,6 +73,11 @@ internal sealed class WheelView : FrameworkElement
 
         int n = _labels.Count;
         double sweep = n == 0 ? 0 : 360.0 / n;
+        double labelRadius = (InnerRadius + outer) / 2;
+        // Horizontal room is the sector's chord near the top/bottom and the ring's thickness at the
+        // sides; the smaller of the two keeps every label inside its sector.
+        double maxLabelWidth = 0.95 * Math.Min(outer - InnerRadius,
+            n <= 2 ? double.MaxValue : 2 * labelRadius * Math.Sin(sweep / 2 * Math.PI / 180));
         for (int i = 0; i < n; i++)
         {
             double start = i * sweep;
@@ -79,8 +87,10 @@ internal sealed class WheelView : FrameworkElement
                 dc.DrawLine(Edge, Polar(c, InnerRadius, start), Polar(c, outer, start));
 
             var label = new FormattedText(_labels[i], CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                Face, 17, i == _hover ? Brushes.Black : Text, ppd);
-            Point mid = Polar(c, (InnerRadius + outer) / 2, start + sweep / 2);
+                Face, LabelSize, i == _hover ? Brushes.Black : Text, ppd);
+            if (label.Width > maxLabelWidth)
+                label.SetFontSize(Math.Max(MinLabelSize, LabelSize * maxLabelWidth / label.Width));
+            Point mid = Polar(c, labelRadius, start + sweep / 2);
             dc.DrawText(label, new Point(mid.X - label.Width / 2, mid.Y - label.Height / 2));
         }
 

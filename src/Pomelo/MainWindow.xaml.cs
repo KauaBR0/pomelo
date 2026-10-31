@@ -7,6 +7,7 @@ using Pomelo.Core.Media;
 using Pomelo.Core.Settings;
 using Pomelo.Core.Startup;
 using Pomelo.Interop;
+using Pomelo.Wheel;
 
 namespace Pomelo;
 
@@ -39,24 +40,17 @@ internal sealed partial class MainWindow : Window
         InitializeComponent();
         _startup = startup;
         _settings = settings;
-        ConvertKeyBox.ItemsSource = Enum.GetValues<WheelKey>();
-        ToolsKeyBox.ItemsSource = Enum.GetValues<WheelKey>();
+        foreach (var box in (System.Windows.Controls.ComboBox[])[ConvertKeyBox, ToolsKeyBox, ActionsKeyBox])
+            box.ItemsSource = Enum.GetValues<WheelKey>();
         ShowSettings(settings);
 
         // Checked/Unchecked (not Click) so keyboard, mouse and UI Automation toggles all count.
         OnToggled(WheelEnabledBox, on => Update(s => s with { WheelEnabled = on }));
         OnToggled(NotifyBox, on => Update(s => s with { NotifyOnCompletion = on }));
-        // Picking the other wheel's key swaps the two, so they never collide.
-        ConvertKeyBox.SelectionChanged += (_, _) =>
-        {
-            if (ConvertKeyBox.SelectedItem is WheelKey key)
-                Update(s => s with { ConvertKey = key, ToolsKey = s.ToolsKey == key ? s.ConvertKey : s.ToolsKey });
-        };
-        ToolsKeyBox.SelectionChanged += (_, _) =>
-        {
-            if (ToolsKeyBox.SelectedItem is WheelKey key)
-                Update(s => s with { ToolsKey = key, ConvertKey = s.ConvertKey == key ? s.ToolsKey : s.ConvertKey });
-        };
+        // Picking another wheel's key swaps the two, so each wheel keeps its own key.
+        OnKeyPicked(ConvertKeyBox, WheelMode.Convert);
+        OnKeyPicked(ToolsKeyBox, WheelMode.Tools);
+        OnKeyPicked(ActionsKeyBox, WheelMode.Actions);
         QualitySlider.ValueChanged += (_, e) => Update(s => s with { JpegQuality = (int)e.NewValue });
 
         BesideBox.Checked += (_, _) => Update(s => s with { OutputLocation = OutputLocation.BesideOriginal });
@@ -90,6 +84,7 @@ internal sealed partial class MainWindow : Window
             WheelEnabledBox.IsChecked = settings.WheelEnabled;
             ConvertKeyBox.SelectedItem = settings.ConvertKey;
             ToolsKeyBox.SelectedItem = settings.ToolsKey;
+            ActionsKeyBox.SelectedItem = settings.ActionsKey;
             QualitySlider.Value = settings.JpegQuality;
             NotifyBox.IsChecked = settings.NotifyOnCompletion;
             CustomFolderText.Text = settings.CustomOutputFolder ?? "Outra pasta…";
@@ -103,9 +98,27 @@ internal sealed partial class MainWindow : Window
         {
             _loading = false;
         }
-        HowTo.Text = $"Comece a arrastar imagens, áudios ou vídeos no Explorer ou na Área de Trabalho e toque em " +
-                     $"{settings.ConvertKey} para converter o formato, ou em {settings.ToolsKey} para as ferramentas " +
-                     "(reduzir, girar, comprimir…). Solte sobre a opção desejada; Esc cancela.";
+        HowTo.Text = "Comece a arrastar arquivos no Explorer ou na Área de Trabalho e toque em " +
+                     $"{settings.ConvertKey} para converter o formato, {settings.ToolsKey} para as ferramentas " +
+                     $"(reduzir, girar, comprimir…) ou {settings.ActionsKey} para as ações (copiar caminho, mover, " +
+                     "compartilhar…). Solte sobre a opção desejada; Esc cancela.";
+    }
+
+    private void OnKeyPicked(System.Windows.Controls.ComboBox box, WheelMode wheel) =>
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedItem is WheelKey key)
+                Update(s => WithKey(s, wheel, key));
+        };
+
+    private static AppSettings WithKey(AppSettings settings, WheelMode wheel, WheelKey key)
+    {
+        WheelKey[] keys = [settings.ConvertKey, settings.ToolsKey, settings.ActionsKey];
+        int other = Array.IndexOf(keys, key);
+        if (other >= 0)
+            keys[other] = keys[(int)wheel];
+        keys[(int)wheel] = key;
+        return settings with { ConvertKey = keys[0], ToolsKey = keys[1], ActionsKey = keys[2] };
     }
 
     /// <param name="info">The FFmpeg in use, or null.</param>

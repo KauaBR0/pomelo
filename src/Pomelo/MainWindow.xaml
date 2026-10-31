@@ -33,11 +33,14 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition />
                                     <RowDefinition />
+                                    <RowDefinition />
                                 </Grid.RowDefinitions>
                                 <TextBlock Text="Converter formato:" VerticalAlignment="Center" Margin="0,0,8,4" />
                                 <ComboBox x:Name="ConvertKeyBox" Grid.Column="1" Width="110" Margin="0,0,0,4" />
-                                <TextBlock Grid.Row="1" Text="Ferramentas:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox x:Name="ToolsKeyBox" Grid.Row="1" Grid.Column="1" Width="110" />
+                                <TextBlock Grid.Row="1" Text="Ferramentas:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                                <ComboBox x:Name="ToolsKeyBox" Grid.Row="1" Grid.Column="1" Width="110" Margin="0,0,0,4" />
+                                <TextBlock Grid.Row="2" Text="Ações (copiar caminho, mover…):" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox x:Name="ActionsKeyBox" Grid.Row="2" Grid.Column="1" Width="110" />
                             </Grid>
                         </StackPanel>
                     </GroupBox>

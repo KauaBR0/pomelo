@@ -27,8 +27,8 @@ internal sealed class GestureMonitor : IDisposable
 
     public bool Enabled { get => _enabled; set => _enabled = value; }
 
-    public WheelKey ConvertKey { get => (WheelKey)_convertKey; set => _convertKey = (int)value; }
-    public WheelKey ToolsKey { get => (WheelKey)_toolsKey; set => _toolsKey = (int)value; }
+    /// <summary>Key per wheel, indexed by <see cref="WheelMode"/>.</summary>
+    public void SetKeys(WheelKey convert, WheelKey tools, WheelKey actions) => _keys = [convert, tools, actions];
 
     private readonly Dispatcher _dispatcher;
     private readonly Thread _thread;
@@ -36,14 +36,14 @@ internal sealed class GestureMonitor : IDisposable
     private Exception? _startError;
     private uint _threadId;
     private volatile bool _enabled = true;
-    private volatile int _convertKey = (int)WheelKey.Shift;
-    private volatile int _toolsKey = (int)WheelKey.Ctrl;
+    private volatile WheelKey[] _keys = [WheelKey.Shift, WheelKey.Ctrl, WheelKey.Alt]; // Replaced, never mutated.
 
     // Hook-thread state only.
     private LowLevelHookProc? _mouseProc, _keyboardProc; // Rooted: native code holds these.
     private IntPtr _mouseHook, _keyboardHook;
     private int _dragDx, _dragDy;
-    private bool _buttonDown, _dragging, _convertDown, _toolsDown, _wheelRequested;
+    private bool _buttonDown, _dragging, _wheelRequested;
+    private readonly bool[] _keyDown = new bool[3]; // Per WheelMode; filters key repeat.
     private POINT _downPoint;
 
     public GestureMonitor(Dispatcher dispatcher)
@@ -120,19 +120,17 @@ internal sealed class GestureMonitor : IDisposable
         {
             var info = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
             bool down = (int)wParam is WM_KEYDOWN or WM_SYSKEYDOWN;
-            WheelMode? mode = IsKey((WheelKey)_convertKey, info.vkCode) ? WheelMode.Convert
-                : IsKey((WheelKey)_toolsKey, info.vkCode) ? WheelMode.Tools
-                : null;
-            if (mode is { } requested)
+            int wheel = Array.FindIndex(_keys, key => IsKey(key, info.vkCode));
+            if (wheel >= 0)
             {
-                ref bool keyDown = ref requested == WheelMode.Convert ? ref _convertDown : ref _toolsDown;
+                var requested = (WheelMode)wheel;
                 // Key repeat sends repeated key-downs; react to the first one only.
-                if (down && !keyDown && _dragging && _enabled)
+                if (down && !_keyDown[wheel] && _dragging && _enabled)
                 {
                     _wheelRequested = true;
                     _dispatcher.BeginInvoke(() => WheelRequested?.Invoke(requested));
                 }
-                keyDown = down;
+                _keyDown[wheel] = down;
             }
             else if (down && info.vkCode == VK_ESCAPE && _wheelRequested)
             {

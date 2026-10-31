@@ -1,6 +1,6 @@
 # Pomelo
 
-Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma imagem, música ou vídeo no Explorer, toque **Shift** e solte sobre o formato desejado, ou toque **Ctrl** para ferramentas como reduzir, girar e comprimir. O resultado aparece ao lado do original. Tudo roda localmente; nenhum arquivo sai do seu computador.
+Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma imagem, música ou vídeo no Explorer, toque **Shift** e solte sobre o formato desejado; **Ctrl** traz ferramentas como reduzir, girar e comprimir, e **Alt** traz ações como copiar o caminho, mover e compartilhar. Tudo roda localmente; nenhum arquivo sai do seu computador.
 
 Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac. Projeto independente, sem relação com o Tangerine.
 
@@ -9,12 +9,13 @@ Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac.
 ## Como usar
 
 1. Abra o Pomelo. Ele fica na bandeja do sistema (perto do relógio; na primeira vez pode estar em "Mostrar ícones ocultos").
-2. No Explorer ou na Área de Trabalho, **comece a arrastar** um ou mais arquivos de imagem, áudio ou vídeo.
+2. No Explorer ou na Área de Trabalho, **comece a arrastar** um ou mais arquivos (ou pastas, na roda de ações).
 3. Com o botão do mouse ainda segurado, toque uma tecla (pode soltá-la em seguida). A roda abre sob o cursor:
    - **Shift**: roda de **conversão** (laranja), para mudar o formato.
    - **Ctrl**: roda de **ferramentas** (verde-água), para editar uma cópia.
+   - **Alt**: roda de **ações** (lilás), para fazer algo com os próprios itens.
 
-   Com a roda aberta, tocar a outra tecla troca de roda.
+   Com a roda aberta, tocar outra dessas teclas troca de roda.
 4. **Solte** os arquivos sobre a opção. Soltar no centro, ou apertar **Esc**, cancela.
 
 O original nunca é alterado nem movido, e nenhum arquivo existente é substituído: se `foto.jpg` já existir, o resultado vira `foto (1).jpg`. Ao terminar, uma notificação mostra o resultado; clicar nela abre o Explorer com o arquivo selecionado.
@@ -39,6 +40,22 @@ Cada ferramenta cria uma cópia com sufixo, por exemplo `foto - 50%.jpg`. Todos 
 | Vídeo | Limpar | Remove metadados e capítulos, sem recodificar | mesmo formato |
 
 "Mesmo formato" de imagem vale para JPG, PNG, TIFF, BMP e GIF; WebP e ICO viram PNG, e HEIC/AVIF viram JPG, porque o Windows não grava esses formatos. Ferramentas de imagem recodificam, então JPGs passam pela qualidade configurada (exceto Comprimir, que usa 70). Ferramentas de áudio e vídeo precisam do FFmpeg.
+
+## Ações
+
+Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão possível.
+
+| Ação | O que faz |
+|---|---|
+| Caminho | Copia o caminho completo (um por linha) para a área de transferência |
+| Copiar | Coloca os itens na área de transferência; Ctrl+V cola uma cópia no Explorer ou em outro app |
+| Copiar em… | Copia para uma pasta escolhida na hora |
+| Mover… | Move para uma pasta escolhida na hora; entre discos, copia e depois apaga a origem |
+| Terminal | Abre o Windows Terminal (ou o PowerShell) na pasta |
+| Compartilhar | Abre o painel Compartilhar do Windows (Compartilhamento por Proximidade, WhatsApp, e-mail…); só arquivos |
+| SHA-256 | Copia o hash; para vários arquivos, no formato do `sha256sum`; só arquivos |
+
+"Copiar em…" e "Mover…" lembram a última pasta usada, nunca substituem nada (um nome já usado vira `nome (1)`) e não colocam uma pasta dentro dela mesma.
 
 ## Formatos
 
@@ -86,7 +103,7 @@ winget install --id Gyan.FFmpeg.Essentials --exact
 
 Clique no ícone da bandeja para abrir a janela:
 
-- **Rodas:** ligar/desligar, e as teclas que abrem a roda de conversão e a de ferramentas (Shift, Ctrl ou Alt; escolher a tecla da outra roda troca as duas).
+- **Rodas:** ligar/desligar, e a tecla de cada roda: conversão, ferramentas e ações (Shift, Ctrl ou Alt; escolher a tecla de outra roda troca as duas).
 - **Arquivos convertidos:** ao lado do original, em Downloads, na Área de Trabalho ou numa pasta escolhida. Qualidade do JPEG.
 - **Áudio e vídeo:** qual FFmpeg está em uso, escolher outro `ffmpeg.exe`, instalar com winget ou procurar de novo.
 - **Sistema:** iniciar com o Windows (abre direto na bandeja) e notificações ao concluir.
@@ -97,7 +114,7 @@ Fechar a janela mantém o Pomelo na bandeja. Para encerrar: clique com o botão 
 
 ## Compilar e rodar
 
-Requisitos: Windows 10 ou 11 (x64) e o [SDK do .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
+Requisitos: Windows 10 versão 2004 ou mais recente, ou Windows 11 (x64), e o [SDK do .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```sh
 git clone https://github.com/KauaBR0/pomelo.git
@@ -129,7 +146,7 @@ sequenceDiagram
     participant H as Hooks globais (thread própria)
     participant W as Roda (janela overlay = alvo OLE)
     participant C as Conversor (thread STA)
-    U->>H: arrasta + toca Shift (ou Ctrl)
+    U->>H: arrasta + toca Shift (ou Ctrl, Alt)
     H->>W: abrir sob o cursor (invisível, sem roubar o foco)
     U->>W: cursor se move sobre a roda
     W->>W: DragEnter recebe a lista de arquivos (CF_HDROP) → desenha as opções
@@ -140,8 +157,9 @@ sequenceDiagram
 
 - **Detecção do gesto** (`src/Pomelo/Input/GestureMonitor.cs`): hooks de mouse e teclado de baixo nível numa thread dedicada. Só observam, nunca consomem ou registram teclas.
 - **Roda** (`src/Pomelo/Wheel/`): janela sempre no topo, que não ativa, registrada como alvo de soltura. Ela abre invisível e só aparece se um arraste de *arquivos* entrar nela. Arrastes de texto ou links passam direto.
-- **Nunca move o original:** no Explorer, Shift durante o arraste significa "mover". A roda sempre responde "copiar".
+- **A soltura nunca move o original:** no Explorer, Shift durante o arraste significa "mover". A roda sempre responde "copiar" ao Explorer; mover só acontece pela ação **Mover…**, depois de você escolher a pasta.
 - **Conversão e ferramentas** (`src/Pomelo.Core/Conversion/`, `src/Pomelo.Core/Tools/`): imagens pelo Windows Imaging Component (WIC, via WPF), sem dependências externas; áudio e vídeo por um processo FFmpeg (`src/Pomelo.Core/Media/`). Cada arquivo de um lote falha ou passa de forma independente.
+- **Ações** (`src/Pomelo/Actions/`, `src/Pomelo.Core/Actions/`): o painel Compartilhar usa a API do Windows para apps desktop (`DataTransferManager`); o "Compartilhar" do menu de contexto do Explorer só funciona dentro do próprio Explorer. Como quem está em primeiro plano na hora da soltura é o Explorer, os diálogos são trazidos para a frente explicitamente.
 
 ### Estrutura
 
@@ -153,7 +171,7 @@ tests/Pomelo.Tests/  testes do núcleo (xUnit)
 
 ## Próximos passos
 
-- Roda de ações de arquivo (copiar caminho, mover, compartilhar…)
+- "Flutuar": manter itens numa prateleira na tela para soltar depois
 - Editores com ajuste fino (recortar, escolher tamanho/qualidade, cortar áudio e vídeo)
 - GIF animado como entrada (por exemplo, GIF → MP4)
 - PDF e documentos

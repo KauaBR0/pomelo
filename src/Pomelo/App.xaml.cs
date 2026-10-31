@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Windows;
+using Pomelo.Actions;
 using Pomelo.Conversion;
 using Pomelo.Core.Conversion;
 using Pomelo.Core.Media;
@@ -33,6 +34,7 @@ public partial class App : Application
     private MainWindow _main = null!;
     private volatile FfmpegInfo? _ffmpeg;
     private int _ffmpegSearch; // Ignores results of a superseded search.
+    private readonly CancellationTokenSource _shutdown = new();
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -64,6 +66,9 @@ public partial class App : Application
         _wheel.Ffmpeg = () => _ffmpeg;
         _wheel.OperationRequested += (paths, operation) => _worker.Enqueue(new ConversionBatch(paths, operation,
             new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality), _ffmpeg));
+        var actions = new ActionRunner(() => _settings, Apply, _tray, _main, _shutdown.Token);
+        _wheel.Actions = actions.For;
+        _wheel.ActionRequested += (paths, action) => actions.Run(action, paths);
         _worker.FileStarted += (path, index, count) =>
             _tray.SetStatus(count == 1 ? $"processando {Path.GetFileName(path)}" : $"processando {Path.GetFileName(path)} ({index}/{count})");
         _worker.FileCompleted += _main.Report;
@@ -112,8 +117,7 @@ public partial class App : Application
     private void ApplyRuntime(AppSettings settings)
     {
         _gestures!.Enabled = settings.WheelEnabled;
-        _gestures.ConvertKey = settings.ConvertKey;
-        _gestures.ToolsKey = settings.ToolsKey;
+        _gestures.SetKeys(settings.ConvertKey, settings.ToolsKey, settings.ActionsKey);
         _tray!.SetWheelEnabled(settings.WheelEnabled);
         if (!settings.WheelEnabled)
             _wheel.Dismiss();
@@ -189,6 +193,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _shutdown.Cancel(); // Stops copy/move/hash work between files.
         _activateWait?.Unregister(null);
         _tray?.Dispose();
         _gestures?.Dispose();

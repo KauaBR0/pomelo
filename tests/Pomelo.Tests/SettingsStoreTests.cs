@@ -18,7 +18,9 @@ public sealed class SettingsStoreTests : IDisposable
             WheelEnabled = false,
             ConvertKey = WheelKey.Alt,
             ToolsKey = WheelKey.Shift,
+            ActionsKey = WheelKey.Ctrl,
             FfmpegPath = @"C:\Tools\ffmpeg.exe",
+            LastTransferFolder = @"E:\Backup",
             OutputLocation = OutputLocation.CustomFolder,
             CustomOutputFolder = @"D:\Convertidos",
             JpegQuality = 75,
@@ -61,15 +63,17 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(WheelKey.Alt, loaded.ConvertKey); // Other values survive the clamp.
     }
 
-    [Fact]
-    public void Both_wheels_on_the_same_key_are_separated_keeping_the_conversion_key()
+    [Theory]
+    [InlineData("""{ "ConvertKey": "Ctrl", "ToolsKey": "Ctrl" }""", WheelKey.Ctrl, WheelKey.Shift, WheelKey.Alt)]
+    [InlineData("""{ "ConvertKey": "Alt", "ToolsKey": "Alt", "ActionsKey": "Alt" }""", WheelKey.Alt, WheelKey.Shift, WheelKey.Ctrl)]
+    public void Wheels_sharing_a_key_are_separated_keeping_the_earlier_wheels_key(
+        string json, WheelKey convert, WheelKey tools, WheelKey actions)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, """{ "ConvertKey": "Ctrl", "ToolsKey": "Ctrl" }""");
+        File.WriteAllText(FilePath, json);
 
         var loaded = new SettingsStore(FilePath).Load();
 
-        Assert.Equal(WheelKey.Ctrl, loaded.ConvertKey);
-        Assert.NotEqual(loaded.ConvertKey, loaded.ToolsKey);
+        Assert.Equal((convert, tools, actions), (loaded.ConvertKey, loaded.ToolsKey, loaded.ActionsKey));
     }
 }

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 using Pomelo.Conversion;
+using Pomelo.Core.Media;
 using Pomelo.Core.Settings;
 using Pomelo.Core.Startup;
 using Pomelo.Interop;
@@ -16,6 +17,10 @@ internal sealed partial class MainWindow : Window
     public event Action<AppSettings>? SettingsChanged;
     /// <summary>Raised when the user closes the window and it hides to the tray.</summary>
     public event Action? HiddenToTray;
+    /// <summary>The user asked to search for FFmpeg again.</summary>
+    public event Action? FfmpegRecheckRequested;
+    /// <summary>The user asked to install FFmpeg via winget.</summary>
+    public event Action? FfmpegInstallRequested;
 
     /// <summary>Set before Application.Shutdown so closing really closes.</summary>
     public bool AllowClose { get; set; }
@@ -60,6 +65,9 @@ internal sealed partial class MainWindow : Window
                 Update(s => s with { OutputLocation = OutputLocation.CustomFolder });
         };
         PickFolderButton.Click += (_, _) => PickCustomFolder();
+        FfmpegPickButton.Click += (_, _) => PickFfmpeg();
+        FfmpegInstallButton.Click += (_, _) => FfmpegInstallRequested?.Invoke();
+        FfmpegRecheckButton.Click += (_, _) => FfmpegRecheckRequested?.Invoke();
 
         OnToggled(StartupBox, SetStartup);
         Activated += (_, _) => RefreshStartup(); // Task Manager can change it while we run.
@@ -87,8 +95,20 @@ internal sealed partial class MainWindow : Window
         {
             _loading = false;
         }
-        HowTo.Text = $"Comece a arrastar imagens no Explorer ou na Área de Trabalho, toque em {settings.TriggerKey} " +
-                     "e solte sobre o formato desejado. Esc cancela.";
+        HowTo.Text = $"Comece a arrastar imagens, áudios ou vídeos no Explorer ou na Área de Trabalho, toque em " +
+                     $"{settings.TriggerKey} e solte sobre o formato desejado. Esc cancela.";
+    }
+
+    /// <param name="info">The FFmpeg in use, or null.</param>
+    /// <param name="busy">A search or install is running.</param>
+    public void ShowFfmpeg(FfmpegInfo? info, bool busy)
+    {
+        FfmpegStatus.Text = busy ? "Procurando o FFmpeg…"
+            : info is null ? "FFmpeg não encontrado. Áudio e vídeo ficam indisponíveis até instalar ou escolher o ffmpeg.exe."
+            : $"FFmpeg {info.Version}: {info.Path}";
+        FfmpegInstallButton.IsEnabled = !busy && info is null;
+        FfmpegRecheckButton.IsEnabled = !busy;
+        FfmpegPickButton.IsEnabled = !busy;
     }
 
     public void Report(ConversionResult result)
@@ -118,6 +138,18 @@ internal sealed partial class MainWindow : Window
             return;
         ShowSettings(updated);
         SettingsChanged?.Invoke(updated);
+    }
+
+    private void PickFfmpeg()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Escolha o ffmpeg.exe",
+            Filter = "ffmpeg.exe|ffmpeg.exe|Programas (*.exe)|*.exe",
+            FileName = _settings.FfmpegPath ?? "",
+        };
+        if (dialog.ShowDialog(this) == true)
+            Update(s => s with { FfmpegPath = dialog.FileName });
     }
 
     private void PickCustomFolder()

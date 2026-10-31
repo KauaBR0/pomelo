@@ -1,3 +1,4 @@
+using Pomelo.Core.Conversion;
 using Pomelo.Core.Settings;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
@@ -16,7 +17,7 @@ namespace Pomelo.Core.Imaging;
 public static class ImageConverter
 {
     /// <returns>The path of the created file.</returns>
-    public static string Convert(string sourcePath, ImageFormat target, ConversionOptions? options = null)
+    public static string Convert(string sourcePath, FileFormat target, ConversionOptions? options = null)
     {
         options ??= new ConversionOptions();
         string directory = options.OutputDirectory ?? Path.GetDirectoryName(Path.GetFullPath(sourcePath))!;

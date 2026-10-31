@@ -54,6 +54,17 @@
                         </StackPanel>
                     </GroupBox>
 
+                    <GroupBox Header="Áudio e vídeo (FFmpeg)">
+                        <StackPanel>
+                            <TextBlock x:Name="FfmpegStatus" TextWrapping="Wrap" Margin="0,0,0,8" Text="Procurando o FFmpeg…" />
+                            <WrapPanel>
+                                <Button x:Name="FfmpegPickButton" Content="Escolher ffmpeg.exe…" Padding="10,2" Margin="0,0,8,4" />
+                                <Button x:Name="FfmpegInstallButton" Content="Instalar com winget" Padding="10,2" Margin="0,0,8,4" />
+                                <Button x:Name="FfmpegRecheckButton" Content="Procurar de novo" Padding="10,2" Margin="0,0,8,4" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </GroupBox>
+
                     <GroupBox Header="Sistema">
                         <StackPanel>
                             <CheckBox x:Name="StartupBox" Content="Iniciar com o Windows (direto na bandeja)" />

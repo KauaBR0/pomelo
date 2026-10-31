@@ -20,6 +20,8 @@ public sealed record AppSettings
     public string? CustomOutputFolder { get; init; }
     public int JpegQuality { get; init; } = 92;
     public bool NotifyOnCompletion { get; init; } = true;
+    /// <summary>ffmpeg.exe chosen by the user; null searches the usual places.</summary>
+    public string? FfmpegPath { get; init; }
     /// <summary>The "still running in the tray" hint is shown once, the first time the window is closed.</summary>
     public bool TrayHintShown { get; init; }
 }

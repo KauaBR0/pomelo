@@ -1,6 +1,6 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Pomelo.Core;
+using Pomelo.Core.Conversion;
 using Pomelo.Core.Formats;
 using Pomelo.Core.Imaging;
 

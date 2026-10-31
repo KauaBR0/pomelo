@@ -3,7 +3,9 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Pomelo.Core.Conversion;
 using Pomelo.Core.Formats;
+using Pomelo.Core.Media;
 using static Pomelo.Interop.NativeMethods;
 
 namespace Pomelo.Wheel;
@@ -19,12 +21,16 @@ internal sealed partial class WheelWindow : Window
     private static readonly TimeSpan NoTargetsLinger = TimeSpan.FromMilliseconds(1200);
 
     /// <summary>Raised after the wheel closes, with the dropped files and chosen target.</summary>
-    public event Action<IReadOnlyList<string>, ImageFormat>? ConversionRequested;
+    public event Action<IReadOnlyList<string>, FileFormat>? ConversionRequested;
+
+    /// <summary>Current FFmpeg, read when files enter the wheel; null hides audio/video targets.</summary>
+    public Func<FfmpegInfo?> Ffmpeg { get; set; } = () => null;
 
     private readonly IntPtr _hwnd;
     private readonly DispatcherTimer _hideTimer;
     private IReadOnlyList<string> _paths = [];
-    private IReadOnlyList<ImageFormat> _targets = [];
+    private IReadOnlyList<FileFormat> _targets = [];
+    private string? _hint;
     private bool _revealed;
 
     public WheelWindow()
@@ -49,6 +55,7 @@ internal sealed partial class WheelWindow : Window
         _hideTimer.Stop();
         _paths = [];
         _targets = [];
+        _hint = null;
         _revealed = false;
         View.Labels = [];
         View.BeginAnimation(OpacityProperty, null);
@@ -103,7 +110,7 @@ internal sealed partial class WheelWindow : Window
     {
         _revealed = true;
         _paths = paths;
-        _targets = ImageFormats.TargetsFor(paths);
+        (_targets, _hint) = ConversionCatalog.For(paths, Ffmpeg());
         View.Labels = _targets.Select(t => t.Name).ToList();
         ShowHover(-1);
 
@@ -141,7 +148,7 @@ internal sealed partial class WheelWindow : Window
         string title = _paths.Count == 1 ? "1 arquivo" : $"{_paths.Count} arquivos";
         string subtitle = sector >= 0 ? $"→ {_targets[sector].Name}"
             : _targets.Count > 0 ? "Converter para…"
-            : "Sem conversões";
+            : _hint ?? "Sem conversões";
         View.SetHub(title, subtitle);
     }
 

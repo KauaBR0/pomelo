@@ -1,7 +1,8 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.Windows;
 using Pomelo.Conversion;
-using Pomelo.Core.Formats;
-using Pomelo.Core.Imaging;
+using Pomelo.Core.Conversion;
+using Pomelo.Core.Media;
 using Pomelo.Core.Settings;
 using Pomelo.Core.Startup;
 using Pomelo.Input;
@@ -30,6 +31,8 @@ public partial class App : Application
     private TrayIcon? _tray;
     private WheelWindow _wheel = null!;
     private MainWindow _main = null!;
+    private volatile FfmpegInfo? _ffmpeg;
+    private int _ffmpegSearch; // Ignores results of a superseded search.
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -58,13 +61,22 @@ public partial class App : Application
         _gestures.WheelRequested += _wheel.OpenAtCursor;
         _gestures.GestureEnded += _wheel.EndGesture;
         _gestures.Cancelled += _wheel.Dismiss;
-        _wheel.ConversionRequested += (paths, target) => _worker.Enqueue(
-            new ConversionBatch(paths, target, new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality)));
+        _wheel.Ffmpeg = () => _ffmpeg;
+        _wheel.ConversionRequested += (paths, target) => _worker.Enqueue(new ConversionBatch(paths, target,
+            new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality), _ffmpeg));
+        _worker.FileStarted += (path, index, count) =>
+            _tray.SetStatus(count == 1 ? $"convertendo {Path.GetFileName(path)}" : $"convertendo {Path.GetFileName(path)} ({index}/{count})");
         _worker.FileCompleted += _main.Report;
-        _worker.BatchCompleted += NotifyBatch;
+        _worker.BatchCompleted += (batch, results) =>
+        {
+            _tray.SetStatus(null);
+            NotifyBatch(batch, results);
+        };
 
         _main.SettingsChanged += Apply;
         _main.HiddenToTray += OnHiddenToTray;
+        _main.FfmpegRecheckRequested += DetectFfmpeg;
+        _main.FfmpegInstallRequested += InstallFfmpeg;
         _tray.OpenRequested += _main.Present;
         _tray.WheelToggled += enabled => Apply(_settings with { WheelEnabled = enabled });
         _tray.ExitRequested += Quit;
@@ -73,13 +85,17 @@ public partial class App : Application
             (_, _) => Dispatcher.BeginInvoke(_main.Present), null, Timeout.Infinite, executeOnlyOnce: false);
 
         ApplyRuntime(_settings);
+        DetectFfmpeg();
         if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase))
             _main.Present();
     }
 
     private void Apply(AppSettings settings)
     {
+        bool ffmpegChanged = settings.FfmpegPath != _settings.FfmpegPath;
         _settings = settings;
+        if (ffmpegChanged)
+            DetectFfmpeg();
         ApplyRuntime(settings);
         _main.ShowSettings(settings);
         try
@@ -100,6 +116,39 @@ public partial class App : Application
         _tray!.SetWheelEnabled(settings.WheelEnabled);
         if (!settings.WheelEnabled)
             _wheel.Dismiss();
+    }
+
+    private async void DetectFfmpeg()
+    {
+        int search = ++_ffmpegSearch;
+        string? configured = _settings.FfmpegPath;
+        _main.ShowFfmpeg(_ffmpeg, busy: true);
+        FfmpegInfo? found = await Task.Run(() => FfmpegLocator.Locate(configured));
+        if (search != _ffmpegSearch)
+            return;
+        _ffmpeg = found;
+        _main.ShowFfmpeg(found, busy: false);
+    }
+
+    /// <summary>Opens winget in a visible console (user-initiated), then searches again.</summary>
+    private async void InstallFfmpeg()
+    {
+        _main.ShowFfmpeg(null, busy: true);
+        try
+        {
+            using var winget = Process.Start(new ProcessStartInfo("winget",
+                "install --id Gyan.FFmpeg.Essentials --exact --source winget --accept-package-agreements --accept-source-agreements")
+            {
+                UseShellExecute = true,
+            })!;
+            await winget.WaitForExitAsync();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            MessageBox.Show("O winget não está disponível neste Windows. Baixe o FFmpeg em https://ffmpeg.org e use " +
+                            "\"Escolher ffmpeg.exe…\".", "Pomelo", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        DetectFfmpeg();
     }
 
     private void OnHiddenToTray()

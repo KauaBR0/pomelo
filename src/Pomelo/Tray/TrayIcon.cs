@@ -47,6 +47,13 @@ internal sealed class TrayIcon : IDisposable
 
     public void SetWheelEnabled(bool enabled) => _wheelItem.Checked = enabled;
 
+    /// <summary>Tooltip suffix while working, e.g. "convertendo video.mp4 (1/3)"; null restores "Pomelo".</summary>
+    public void SetStatus(string? status)
+    {
+        string text = status is null ? "Pomelo" : $"Pomelo — {status}";
+        _icon.Text = text.Length <= 127 ? text : text[..126] + "…"; // NotifyIcon limit.
+    }
+
     /// <param name="revealPath">Selected in Explorer when the notification is clicked; null opens Pomelo.</param>
     public void Notify(string title, string text, string? revealPath)
     {

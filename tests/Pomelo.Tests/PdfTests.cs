@@ -15,19 +15,22 @@ public sealed class PdfTests : IDisposable
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 
+    /// <summary>A4 in DIPs (1/96 inch), as Windows' PDF engine reports page sizes.</summary>
+    private const double A4Short = 793.7, A4Long = 1122.5;
+
     [Fact]
-    public void Images_become_one_pdf_with_a_page_per_image_in_drop_order_sized_by_dpi()
+    public void Images_become_one_a4_pdf_with_a_page_per_image_in_drop_order()
     {
         string red = Save("red.png", 120, 80, 96, 0xFFFF0000, new PngBitmapEncoder());
-        string blue = Save("blue.jpg", 600, 300, 300, 0xFF0000FF, new JpegBitmapEncoder());
+        string blue = Save("blue.jpg", 300, 600, 300, 0xFF0000FF, new JpegBitmapEncoder());
 
         string pdf = PdfWriter.Combine([red, blue], _options);
 
         Assert.Equal(Path.Combine(_dir, "red.pdf"), pdf);
         var document = Open(pdf);
         Assert.Equal(2u, document.PageCount);
-        AssertSize(120, 80, document.GetPage(0).Size); // 96 DPI: 1 px = 1 DIP.
-        AssertSize(192, 96, document.GetPage(1).Size); // 300 DPI: 600 px = 2 inches.
+        AssertSize(A4Long, A4Short, document.GetPage(0).Size); // Wide image: landscape.
+        AssertSize(A4Short, A4Long, document.GetPage(1).Size); // Tall image: portrait.
 
         string pages = PdfPages.Convert(pdf, ImageFormats.Png, _options);
         Assert.Equal(Path.Combine(_dir, "red"), pages);
@@ -35,6 +38,28 @@ public sealed class PdfTests : IDisposable
         AssertNear(0xFF0000, Center(Path.Combine(pages, "página 01.png")));
         AssertNear(0x0000FF, Center(Path.Combine(pages, "página 02.png")));
         Assert.True(File.Exists(red) && File.Exists(blue));
+    }
+
+    [Fact]
+    public void Small_images_keep_their_size_and_large_ones_shrink_into_the_margin_centred()
+    {
+        // 96 × 48 px at 96 DPI = 1 × 0.5 inch → 200 × 100 px when the page is rendered at 200 DPI.
+        string small = Save("small.bmp", 96, 48, 96, 0xFF00A000, new BmpBitmapEncoder());
+        // 3000 × 4000 px at 72 DPI ≈ 1 × 1.4 m: must shrink to the 1 cm margins of a portrait page.
+        string large = Save("large.png", 3000, 4000, 72, 0xFFFF0000, new PngBitmapEncoder());
+
+        string pages = PdfPages.Convert(PdfWriter.Combine([small, large], _options), ImageFormats.Png, _options);
+
+        var (sx, sy, sw, sh, pw, ph) = Extent(Path.Combine(pages, "página 01.png"));
+        Assert.InRange(sw, 198, 202);
+        Assert.InRange(sh, 98, 102);
+        Assert.InRange(sx - (pw - sx - sw), -2, 2); // Centred horizontally…
+        Assert.InRange(sy - (ph - sy - sh), -2, 2); // …and vertically.
+
+        var (lx, _, lw, _, lpw, _) = Extent(Path.Combine(pages, "página 02.png"));
+        double margin = 1 / 2.54 * PdfPages.RenderDpi; // 1 cm in pixels.
+        Assert.InRange(lx, margin - 2, margin + 2); // Width-limited: touches both side margins.
+        Assert.InRange(lpw - lx - lw, margin - 2, margin + 2);
     }
 
     [Fact]
@@ -59,7 +84,8 @@ public sealed class PdfTests : IDisposable
 
         Assert.Equal(Path.Combine(_dir, "doc" + target.Extension), image);
         var frame = BitmapDecoder.Create(new Uri(image), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
-        Assert.Equal((200, 100), (frame.PixelWidth, frame.PixelHeight)); // 1 × 0.5 inch at 200 DPI.
+        Assert.InRange(frame.PixelWidth, 2337, 2340); // Landscape A4 (297 × 210 mm) at 200 DPI.
+        Assert.InRange(frame.PixelHeight, 1652, 1655);
         AssertNear(0x00A000, Center(image));
     }
 
@@ -126,6 +152,26 @@ public sealed class PdfTests : IDisposable
         var pixel = new uint[1];
         frame.CopyPixels(new System.Windows.Int32Rect(frame.PixelWidth / 2, frame.PixelHeight / 2, 1, 1), pixel, 4, 0);
         return pixel[0] & 0xFFFFFF;
+    }
+
+    /// <summary>Bounding box of non-white pixels, plus the page size, in pixels.</summary>
+    private static (int X, int Y, int Width, int Height, int PageWidth, int PageHeight) Extent(string path)
+    {
+        var frame = new FormatConvertedBitmap(
+            BitmapDecoder.Create(new Uri(path), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0], PixelFormats.Bgra32, null, 0);
+        int w = frame.PixelWidth, h = frame.PixelHeight;
+        var pixels = new uint[w * h];
+        frame.CopyPixels(pixels, w * 4, 0);
+        int left = w, top = h, right = -1, bottom = -1;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                uint p = pixels[y * w + x];
+                if ((p & 0xFF) > 200 && (p >> 8 & 0xFF) > 200 && (p >> 16 & 0xFF) > 200)
+                    continue; // White.
+                (left, top, right, bottom) = (Math.Min(left, x), Math.Min(top, y), Math.Max(right, x), Math.Max(bottom, y));
+            }
+        return (left, top, right - left + 1, bottom - top + 1, w, h);
     }
 
     private static void AssertNear(uint expected, uint actual)

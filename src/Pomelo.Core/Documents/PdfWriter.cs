@@ -11,15 +11,20 @@ using Pomelo.Core.IO;
 namespace Pomelo.Core.Documents;
 
 /// <summary>
-/// Combines images into one PDF, one image per page, in the given order. Each page is the
-/// image's own size (from its DPI, 96 when unknown), so nothing is cropped or stretched.
-/// Photos are stored as JPEG; everything else losslessly (Flate). The PDF is written to a
+/// Combines images into one PDF, one image per A4 page, in the given order. The page turns
+/// landscape for wide images; the image is centred inside a 1 cm margin, shrunk to fit when
+/// larger and never enlarged (its natural size comes from its DPI, 96 when unknown), so
+/// nothing is cropped, stretched or blurred. Pixels are kept at full resolution. Photos are
+/// stored as JPEG; everything else losslessly (Flate). The PDF is written to a
 /// "~pomelo-*.part" file and only renamed once complete.
 /// </summary>
 public static class PdfWriter
 {
-    /// <summary>PDF viewers reject pages larger than 200 inches (14 400 pt).</summary>
-    private const double MaxPageSide = 14_400;
+    /// <summary>A4 in points (1/72 inch): 210 × 297 mm.</summary>
+    public const double A4Short = 595.276, A4Long = 841.89;
+
+    /// <summary>1 cm: keeps the image clear of the unprintable edge of most printers.</summary>
+    public const double Margin = 28.346;
 
     /// <returns>The path of the created PDF, named after the first image.</returns>
     public static string Combine(IReadOnlyList<string> images, ConversionOptions options, CancellationToken cancellation = default)
@@ -55,10 +60,14 @@ public static class PdfWriter
             cancellation.ThrowIfCancellationRequested();
             int page = 3 + 3 * i, contents = page + 1, picture = page + 2;
             var (image, width, height) = LoadPage(images[i], options);
+            bool landscape = width > height;
+            double pageWidth = landscape ? A4Long : A4Short, pageHeight = landscape ? A4Short : A4Long;
+            double fit = Math.Min(1, Math.Min((pageWidth - 2 * Margin) / width, (pageHeight - 2 * Margin) / height));
+            double w = width * fit, h = height * fit, x = (pageWidth - w) / 2, y = (pageHeight - h) / 2;
 
-            pdf.Object(page, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {Num(width)} {Num(height)}] " +
+            pdf.Object(page, $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {Num(pageWidth)} {Num(pageHeight)}] " +
                              $"/Resources << /XObject << /Im0 {picture} 0 R >> /ProcSet [/PDF /ImageC] >> /Contents {contents} 0 R >>");
-            pdf.Stream(contents, "", Encoding.ASCII.GetBytes($"q {Num(width)} 0 0 {Num(height)} 0 0 cm /Im0 Do Q"));
+            pdf.Stream(contents, "", Encoding.ASCII.GetBytes($"q {Num(w)} 0 0 {Num(h)} {Num(x)} {Num(y)} cm /Im0 Do Q"));
             pdf.Stream(picture, $"/Type /XObject /Subtype /Image /Width {image.PixelWidth} /Height {image.PixelHeight} " +
                                 $"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /{image.Filter}", image.Data);
         }
@@ -71,6 +80,7 @@ public static class PdfWriter
 
     private sealed record PageImage(int PixelWidth, int PixelHeight, string Filter, byte[] Data);
 
+    /// <returns>The image and its natural size in points.</returns>
     private static (PageImage Image, double Width, double Height) LoadPage(string path, ConversionOptions options)
     {
         BitmapSource bitmap;
@@ -85,13 +95,12 @@ public static class PdfWriter
 
         int w = bitmap.PixelWidth, h = bitmap.PixelHeight;
         double width = w * 72 / Dpi(bitmap.DpiX), height = h * 72 / Dpi(bitmap.DpiY);
-        double shrink = Math.Min(1, MaxPageSide / Math.Max(width, height));
 
         // Photos stay JPEG-sized; screenshots, drawings and transparency-flattened art stay sharp.
         PageImage image = ImageFormats.SameOrClosest(path) == ImageFormats.Jpeg
             ? new(w, h, "DCTDecode", ImageConverter.Encode(bitmap, ImageFormats.Jpeg, options))
             : new(w, h, "FlateDecode", Deflate(Rgb(bitmap)));
-        return (image, width * shrink, height * shrink);
+        return (image, width, height);
     }
 
     /// <summary>Bgr32 → packed RGB rows, as PDF's DeviceRGB expects.</summary>

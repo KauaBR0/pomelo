@@ -1,0 +1,105 @@
+<Window x:Class="Pomelo.PdfEditor.PdfEditorWindow" x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Editar textos — Pomelo" Width="1180" Height="800" MinWidth="820" MinHeight="520"
+        Icon="pack://application:,,,/Assets/Pomelo.ico" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="430" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Page preview: always shows the edited document. -->
+        <DockPanel Background="#FFE9E9EC">
+            <DockPanel DockPanel.Dock="Top" Margin="12,8" LastChildFill="False">
+                <Button x:Name="PreviousPage" Content="◀" Width="32" ToolTip="Página anterior" />
+                <TextBlock x:Name="PageText" VerticalAlignment="Center" Margin="10,0" MinWidth="110" TextAlignment="Center" />
+                <Button x:Name="NextPage" Content="▶" Width="32" ToolTip="Próxima página" />
+                <TextBlock DockPanel.Dock="Right" Foreground="#FF666666" VerticalAlignment="Center"
+                           Text="Clique num texto da página para editá-lo" />
+            </DockPanel>
+            <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <Grid x:Name="PageHost" Margin="16" HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Grid.Effect>
+                        <DropShadowEffect BlurRadius="10" ShadowDepth="1" Opacity="0.25" />
+                    </Grid.Effect>
+                    <Image x:Name="PageImage" Stretch="Fill" />
+                    <Canvas x:Name="Overlay" Background="Transparent" Cursor="IBeam" />
+                </Grid>
+            </ScrollViewer>
+        </DockPanel>
+
+        <!-- Lines. -->
+        <DockPanel Grid.Column="1" Margin="12,10,12,0">
+            <TextBlock DockPanel.Dock="Top" x:Name="FileText" FontWeight="SemiBold" FontSize="14"
+                       TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
+
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBox x:Name="SearchBox" Padding="4,3" />
+                <TextBlock x:Name="SearchHint" Text="Buscar nas linhas…" Foreground="#FF999999" Margin="8,4,0,0"
+                           IsHitTestVisible="False" />
+            </Grid>
+
+            <Expander DockPanel.Dock="Top" Header="Localizar e substituir" Margin="0,0,0,8">
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Localizar:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                    <TextBox x:Name="FindBox" Grid.Column="1" Padding="4,2" Margin="0,0,0,4" />
+                    <TextBlock Grid.Row="1" Text="Substituir por:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                    <TextBox x:Name="ReplaceBox" Grid.Row="1" Grid.Column="1" Padding="4,2" Margin="0,0,0,4" />
+                    <DockPanel Grid.Row="2" Grid.ColumnSpan="2">
+                        <Button x:Name="ReplaceAllButton" DockPanel.Dock="Right" Content="Substituir tudo" Padding="10,3" />
+                        <CheckBox x:Name="MatchCaseBox" Content="Diferenciar maiúsculas" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Grid>
+            </Expander>
+
+            <ListBox x:Name="LineList" HorizontalContentAlignment="Stretch" BorderThickness="0"
+                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,4,0,6">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Desfazer" Padding="6,0" FontSize="11"
+                                        Tag="{Binding}" Click="OnRevert" ToolTip="Voltar ao texto original"
+                                        Visibility="{Binding Changed, Converter={StaticResource Visible}}" />
+                                <TextBlock Text="{Binding Header}" Foreground="#FF777777" FontSize="11" />
+                            </DockPanel>
+                            <TextBox Text="{Binding Text, UpdateSourceTrigger=LostFocus}" Padding="4,3" Margin="0,2,0,0"
+                                     TextWrapping="Wrap" GotKeyboardFocus="OnLineFocused" KeyDown="OnLineKeyDown" />
+                            <TextBlock Text="{Binding Warning}" Foreground="#FFC05600" FontSize="11" TextWrapping="Wrap"
+                                       Margin="0,2,0,0" Visibility="{Binding HasWarning, Converter={StaticResource Visible}}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Footer. -->
+        <Border Grid.Row="1" Grid.ColumnSpan="2" BorderBrush="#FFDDDDDD" BorderThickness="0,1,0,0" Padding="12,8">
+            <DockPanel>
+                <Button x:Name="SaveButton" DockPanel.Dock="Right" Content="Salvar cópia" Padding="16,4" Margin="8,0,0,0"
+                        IsDefault="False" FontWeight="SemiBold" />
+                <Button x:Name="CloseButton" DockPanel.Dock="Right" Content="Fechar" Padding="14,4" />
+                <TextBlock x:Name="StatusText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

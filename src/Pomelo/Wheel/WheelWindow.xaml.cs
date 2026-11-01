@@ -4,6 +4,7 @@ using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Pomelo.Core.Conversion;
+using Pomelo.Core.Formats;
 using Pomelo.Core.Media;
 using Pomelo.Core.Tools;
 using Pomelo.Actions;
@@ -25,6 +26,8 @@ internal sealed partial class WheelWindow : Window
     public event Action<IReadOnlyList<string>, IFileOperation>? OperationRequested;
     /// <summary>Raised after the wheel closes, with the dropped items and the chosen action.</summary>
     public event Action<IReadOnlyList<string>, FileAction>? ActionRequested;
+    /// <summary>Raised after the wheel closes when "Editar textos" was chosen for a single PDF.</summary>
+    public event Action<string>? PdfEditRequested;
 
     /// <summary>Current FFmpeg, read when files enter the wheel; null hides audio/video targets.</summary>
     public Func<FfmpegInfo?> Ffmpeg { get; set; } = () => null;
@@ -192,6 +195,13 @@ internal sealed partial class WheelWindow : Window
                 _hint = conversions.Hint;
                 break;
             case WheelMode.Tools:
+                if (_paths is [var pdf] && DocumentFormats.Pdf.Matches(pdf) && File.Exists(pdf))
+                {
+                    // Interactive, so not an IFileOperation: it opens a window instead of producing a file.
+                    _items = [new WheelItem("Editar textos", "Editar os textos do PDF", p => PdfEditRequested?.Invoke(p[0]))];
+                    _hint = null;
+                    break;
+                }
                 var tools = ToolCatalog.For(_paths, Ffmpeg());
                 _items = FromOperations(tools.Tools);
                 _hint = tools.Hint;

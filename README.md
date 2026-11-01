@@ -23,7 +23,7 @@ Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma i
 
 Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac. Projeto independente, sem relação com o Tangerine.
 
-> **Estado:** em desenvolvimento. Converte imagens, áudio, vídeo e PDF (páginas ↔ imagens); documentos do Office ainda não.
+> **Estado:** em desenvolvimento. Converte imagens, áudio, vídeo e PDF (páginas ↔ imagens) e edita os textos de PDFs; documentos do Office ainda não.
 
 ## Como usar
 
@@ -59,6 +59,22 @@ Cada ferramenta cria uma cópia com sufixo, por exemplo `foto - 50%.jpg`. Todos 
 | Vídeo | Limpar | Remove metadados e capítulos, sem recodificar | mesmo formato |
 
 "Mesmo formato" de imagem vale para JPG, PNG, TIFF, BMP e GIF; WebP e ICO viram PNG, e HEIC/AVIF viram JPG, porque o Windows não grava esses formatos. Ferramentas de imagem recodificam, então JPGs passam pela qualidade configurada (exceto Comprimir, que usa 70). Ferramentas de áudio e vídeo precisam do FFmpeg.
+
+### Editar textos de PDF
+
+Arraste **um** PDF, toque **Ctrl** e solte em **Editar textos**. Abre uma janela com a página à esquerda e todas as linhas de texto à direita:
+
+- Edite direto na lista, ou clique num texto da página para ir até ele. **Enter** aplica; a prévia mostra o resultado na hora, e **Desfazer** volta ao original daquela linha. Apagar todo o texto de uma linha remove a linha.
+- **Buscar** filtra a lista; **Localizar e substituir** troca um texto em todas as linhas de uma vez (sem atravessar de uma linha para a outra).
+- **Salvar cópia** cria `nome (editado).pdf`; o original não muda. Antes de entregar, o Pomelo reabre o arquivo gravado e confere cada alteração; se algo não bater, nada é criado.
+
+A linha alterada mantém fonte, tamanho, cor e posição, e o texto antigo sai do arquivo (não fica escondido embaixo). Limites, os mesmos de editores como o Acrobat:
+
+- **O texto não se reorganiza.** O PDF guarda linhas posicionadas, não parágrafos: um texto mais longo não empurra o resto. A lista avisa quando ele passa do espaço da linha e pode ficar por cima do que vem ao lado. Serve para corrigir nomes, datas, valores e frases curtas.
+- **Letras que o PDF não tem.** Muitos PDFs guardam só as letras usadas. Se a alteração precisar de outra (um "Z" que não aparecia no documento, por exemplo), a linha é reescrita na mesma fonte instalada no Windows (ou em Arial), com aviso. Como a fonte inteira entra no arquivo, ele cresce algumas centenas de KB.
+- **Recusados, com mensagem:** PDFs com senha ou proteção contra alterações, assinados digitalmente (a edição invalidaria a assinatura), escaneados ou só com imagens (não há texto), e os que usam fontes desenhadas (Type 3), que não dá para regravar sem estragar a página. Texto dentro de elementos agrupados (form XObjects) não aparece na lista.
+
+A edição usa o [PDFium](https://pdfium.googlesource.com/pdfium/), o motor de PDF do Chrome (licença BSD), na compilação de [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) (Apache-2.0), que vem junto com o Pomelo.
 
 ## Ações
 
@@ -207,7 +223,8 @@ sequenceDiagram
 - **Detecção do gesto** (`src/Pomelo/Input/GestureMonitor.cs`): hooks de mouse e teclado de baixo nível numa thread dedicada. Só observam, nunca consomem ou registram teclas.
 - **Roda** (`src/Pomelo/Wheel/`): janela sempre no topo, que não ativa, registrada como alvo de soltura. Ela abre invisível e só aparece se um arraste de *arquivos* entrar nela. Arrastes de texto ou links passam direto.
 - **A soltura nunca move o original:** no Explorer, Shift durante o arraste significa "mover". A roda sempre responde "copiar" ao Explorer; mover só acontece pela ação **Mover…**, depois de você escolher a pasta.
-- **Conversão e ferramentas** (`src/Pomelo.Core/Conversion/`, `src/Pomelo.Core/Tools/`): imagens pelo Windows Imaging Component (WIC, via WPF), sem dependências externas; áudio e vídeo por um processo FFmpeg (`src/Pomelo.Core/Media/`). Cada arquivo de um lote falha ou passa de forma independente.
+- **Conversão e ferramentas** (`src/Pomelo.Core/Conversion/`, `src/Pomelo.Core/Tools/`): imagens pelo Windows Imaging Component (WIC, via WPF), sem dependências externas; PDF ↔ imagens pelo leitor de PDF do Windows (`Windows.Data.Pdf`) e por um gravador próprio; áudio e vídeo por um processo FFmpeg (`src/Pomelo.Core/Media/`). Cada arquivo de um lote falha ou passa de forma independente.
+- **Editar textos de PDF** (`src/Pomelo.Core/Documents/PdfTextDocument.cs`, `src/Pomelo/PdfEditor/`): o PDFium lista os objetos de texto de cada página; o Pomelo junta os pedaços (muitos PDFs gravam palavra por palavra ou letra por letra) em linhas pela linha de base, fonte, tamanho e cor. Cada edição é refeita a partir do original, então desfazer é exato. Letras ausentes são detectadas relendo o texto depois da troca.
 - **Ações** (`src/Pomelo/Actions/`, `src/Pomelo.Core/Actions/`): o painel Compartilhar usa a API do Windows para apps desktop (`DataTransferManager`); o "Compartilhar" do menu de contexto do Explorer só funciona dentro do próprio Explorer. Como quem está em primeiro plano na hora da soltura é o Explorer, os diálogos são trazidos para a frente explicitamente.
 
 ### Estrutura

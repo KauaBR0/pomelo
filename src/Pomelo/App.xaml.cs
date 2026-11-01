@@ -3,11 +3,13 @@ using System.Windows;
 using Pomelo.Actions;
 using Pomelo.Conversion;
 using Pomelo.Core.Conversion;
+using Pomelo.Core.Documents;
 using Pomelo.Core.Media;
 using Pomelo.Core.Settings;
 using Pomelo.Core.Startup;
 using Pomelo.Input;
 using Pomelo.Interop;
+using Pomelo.PdfEditor;
 using Pomelo.Shelf;
 using Pomelo.Tray;
 using Pomelo.Wheel;
@@ -71,6 +73,7 @@ public partial class App : Application
         _actions = new ActionRunner(() => _settings, Apply, _tray, _main, new ShelfWindow(), _shutdown.Token);
         _wheel.Actions = _actions.For;
         _wheel.ActionRequested += (paths, action) => _actions.Run(action, paths);
+        _wheel.PdfEditRequested += OpenPdfEditor;
         _worker.FileStarted += (path, index, count) =>
             _tray.SetStatus(count == 1 ? $"processando {Path.GetFileName(path)}" : $"processando {Path.GetFileName(path)} ({index}/{count})");
         _worker.FileCompleted += _main.Report;
@@ -164,6 +167,24 @@ public partial class App : Application
             return;
         _tray!.Notify("O Pomelo continua rodando", "A roda segue ativa. Use o ícone da bandeja para abrir ou sair.", null);
         Apply(_settings with { TrayHintShown = true });
+    }
+
+    private void OpenPdfEditor(string path)
+    {
+        PdfTextDocument document;
+        try
+        {
+            document = PdfTextDocument.Open(path);
+        }
+        catch (ConversionException ex)
+        {
+            _tray!.Notify("Não dá para editar este PDF", ex.Message, null);
+            return;
+        }
+        var editor = new PdfEditorWindow(document, () => OutputFolders.Resolve(_settings) ?? Path.GetDirectoryName(path)!);
+        editor.Saved += saved => _tray!.Notify("PDF editado", Path.GetFileName(saved), saved);
+        editor.Show();
+        editor.Activate();
     }
 
     private void NotifyBatch(ConversionBatch batch, IReadOnlyList<ConversionResult> results)

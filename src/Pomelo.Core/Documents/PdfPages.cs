@@ -61,6 +61,10 @@ public static class PdfPages
         }
     }
 
+    /// <summary>Page count as Windows' own PDF engine sees it (an independent check on files PDFium wrote).</summary>
+    /// <exception cref="ConversionException">Windows cannot read the file.</exception>
+    internal static uint CountPages(string path) => Open(path).PageCount;
+
     private static PdfDocument Open(string path)
     {
         try

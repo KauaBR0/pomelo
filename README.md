@@ -3,7 +3,7 @@
 Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma imagem, música ou vídeo no Explorer, toque **Shift** e solte sobre o formato desejado; **Ctrl** traz ferramentas como reduzir, girar e comprimir, e **Alt** traz ações como copiar o caminho, mover e compartilhar. Tudo roda localmente; nenhum arquivo sai do seu computador.
 
 <p align="center">
-  <a href="docs/media/pomelo-trailer.mp4"><img src="docs/media/pomelo-trailer.jpg" width="720" alt="Trailer do Pomelo: arraste foto.heic, toque Shift, solte em JPG e o original continua lá"></a>
+  <a href="docs/media/pomelo-trailer.mp4"><img src="docs/media/pomelo-trailer.jpg" width="720" alt="Trailer do Pomelo: foto.heic arrastada, Shift abre a roda e o arquivo vira foto.jpg"></a>
   <br>
   <sub>▶ <a href="docs/media/pomelo-trailer.mp4">Assista ao trailer (10 s, com som)</a></sub>
 </p>

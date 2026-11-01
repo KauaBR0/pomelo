@@ -40,6 +40,22 @@ public static partial class TestFfmpeg
         return (int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value));
     }
 
+    /// <summary>Runs FFmpeg and returns what it wrote to stdout (use "-" as the output).</summary>
+    public static byte[] Output(params string[] args)
+    {
+        var start = new ProcessStartInfo(Info!.Path)
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (string arg in (string[])["-hide_banner", "-loglevel", "error", .. args])
+            start.ArgumentList.Add(arg);
+        using var process = Process.Start(start)!;
+        var stderr = process.StandardError.ReadToEndAsync();
+        using var stdout = new MemoryStream();
+        process.StandardOutput.BaseStream.CopyTo(stdout);
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, $"ffmpeg {string.Join(' ', args)}\n{stderr.Result}");
+        return stdout.ToArray();
+    }
+
     private static void Run(string[] args)
     {
         var (exit, stderr) = Exec(args);

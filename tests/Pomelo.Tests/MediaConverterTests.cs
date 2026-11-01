@@ -114,6 +114,34 @@ public sealed class MediaConverterTests : IDisposable
             AssertDecodes(output, "0:v:0");
     }
 
+    public static TheoryData<string> AnimatedGifOutputs() => new(MediaFormats.AnimatedGifOutputs.Select(f => f.Name));
+
+    /// <summary>Odd-sized, transparent, 5 distinct frames: size fixed, every frame kept, transparency on white.</summary>
+    [FfmpegTheory("libx264", "aac", "libvpx-vp9", "libopus", "mpeg4", "libmp3lame", "wmv2", "wmav2", "gif")]
+    [MemberData(nameof(AnimatedGifOutputs))]
+    public void Animated_gif_converts_to_every_offered_video_format(string name)
+    {
+        var target = MediaFormats.AnimatedGifOutputs.Single(f => f.Name == name);
+        string gif = Generate(At("anim.gif"), "-f", "lavfi", "-i",
+            "testsrc2=s=33x21:r=5:d=1,format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(gt(X,16),0,255)'",
+            "-vf", "split[a][b];[a]palettegen=reserve_transparent=1[p];[b][p]paletteuse=alpha_threshold=128");
+        Assert.True(GifAnimation.IsAnimated(gif));
+
+        string output = MediaConverter.Convert(gif, target, _options, Info!);
+
+        Assert.Equal(At("anim" + target.Extension), output);
+        AssertDecodes(output, "0:v:0");
+        var (width, height) = VideoSize(output);
+        Assert.InRange(width, 32, 33); // H.264 recipes round odd sizes down; VP9 keeps them.
+        Assert.InRange(height, 20, 21);
+        string frames = System.Text.Encoding.ASCII.GetString(Output("-i", output, "-map", "0:v:0", "-f", "framemd5", "-"));
+        Assert.Equal(5, frames.Split('\n').Count(line => line.StartsWith("0,", StringComparison.Ordinal)));
+        byte[] corner = Output("-i", output, "-frames:v", "1", "-vf", "format=rgb24,crop=1:1:28:10",
+            "-f", "rawvideo", "-pix_fmt", "rgb24", "-");
+        // Right half is transparent: it must come out white (FFmpeg's GIF decoder paints it so), not black.
+        Assert.All(corner, channel => Assert.InRange(channel, 225, 255));
+    }
+
     private string At(string name) => Path.Combine(_dir, name);
 
     private string Clip(string name, bool withAudio)

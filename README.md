@@ -93,7 +93,7 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 - Fotos de celular são giradas conforme a orientação EXIF, então não saem deitadas.
 - Em JPG, BMP e GIF (sem transparência), áreas transparentes viram fundo branco. GIF usa uma paleta otimizada de 256 cores.
 - Perfis RGB são preservados em JPG, PNG e TIFF. Imagens CMYK/cinza com perfil, e saídas BMP/GIF, são convertidas para sRGB; o perfil de origem não é anexado a pixels de outro espaço de cor.
-- GIF animado e TIFF com várias páginas ainda não são suportados: o Pomelo recusa com uma mensagem, em vez de descartar quadros em silêncio.
+- GIF animado vira vídeo pela roda de conversão (veja abaixo). As ferramentas de imagem e TIFF com várias páginas ainda não aceitam arquivos com vários quadros: o Pomelo recusa com uma mensagem, em vez de descartar quadros em silêncio.
 
 ### Áudio e vídeo (requer FFmpeg)
 
@@ -102,11 +102,13 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 | **Áudio → áudio** | MP3, M4A (AAC), WAV, FLAC, OGG (Vorbis), OPUS, AIFF, WMA |
 | **Vídeo → vídeo** | MP4 e MOV (H.264 + AAC), MKV, WEBM (VP9 + Opus), AVI, WMV, GIF animado |
 | **Vídeo → áudio** | MP3 (extrai a trilha sonora) |
+| **GIF animado → vídeo** | MP4, MOV, MKV, WEBM, AVI, WMV |
 | **Entrada de áudio** | MP3, M4A, AAC, WAV, FLAC, OGG, OPUS, AIFF, WMA |
-| **Entrada de vídeo** | MP4, M4V, MOV, MKV, WEBM, AVI, WMV, FLV, MPG, TS/MTS/M2TS, 3GP, OGV |
+| **Entrada de vídeo** | MP4, M4V, MOV, MKV, WEBM, AVI, WMV, FLV, MPG, TS/MTS/M2TS, 3GP, OGV, GIF animado |
 
 - Usa o primeiro fluxo de vídeo e o primeiro de áudio; legendas e capas embutidas não são copiadas.
 - Vídeos com largura ou altura ímpar são ajustados em 1 pixel (exigência do H.264). GIF animado sai com 12 fps e no máximo 640 px de largura.
+- GIF animado vira vídeo sem som, com os mesmos quadros e tempos do original; áreas transparentes viram fundo branco. Um GIF de um só quadro continua sendo tratado como imagem.
 - WMA e WMV saem com áudio estéreo, inclusive quando a entrada tem som surround (5.1 ou mais canais).
 - Só aparecem os formatos que o FFmpeg instalado consegue gerar.
 - O FFmpeg roda com prioridade baixa, para não travar o computador. Durante a conversão, passe o mouse no ícone da bandeja para ver o andamento. Enquanto converte, existe um arquivo temporário `~pomelo-….part` na pasta de saída, apagado em caso de falha ou ao sair do Pomelo.
@@ -199,7 +201,6 @@ tests/Pomelo.Tests/  testes do núcleo (xUnit)
 
 - "Flutuar": manter itens numa prateleira na tela para soltar depois
 - Editores com ajuste fino (recortar, escolher tamanho/qualidade, cortar áudio e vídeo)
-- GIF animado como entrada (por exemplo, GIF → MP4)
 - PDF e documentos
 - Instalador
 

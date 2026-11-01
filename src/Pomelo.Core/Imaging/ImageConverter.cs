@@ -130,8 +130,9 @@ public static class ImageConverter
         else if (decoder.Frames.Count == 1)
             frame = decoder.Frames[0];
         else
-            throw new ConversionException(
-                $"Arquivos com {decoder.Frames.Count} quadros/páginas ainda não são suportados (GIF animado, TIFF multipágina).");
+            throw new ConversionException(decoder is GifBitmapDecoder
+                ? $"GIF animado ({decoder.Frames.Count} quadros): use a roda de conversão (Shift) para virar vídeo."
+                : $"Arquivos com {decoder.Frames.Count} páginas ainda não são suportados (TIFF multipágina).");
 
         colorContexts = frame.ColorContexts;
         return ApplyOrientation(frame, ReadOrientation(frame));

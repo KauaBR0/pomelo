@@ -13,7 +13,8 @@ public static class ConversionCatalog
     /// <summary>
     /// Targets valid for every path (intersection), in the first file's wheel order. A target
     /// is omitted when every input already has that format. Audio/video targets the FFmpeg
-    /// build cannot encode are omitted. Any folder, missing or unknown file disables conversion.
+    /// build cannot encode are omitted. An animated GIF counts as silent video. Any folder,
+    /// missing or unknown file disables conversion.
     /// </summary>
     public static ConversionChoices For(IReadOnlyCollection<string> paths, FfmpegInfo? ffmpeg)
     {
@@ -26,19 +27,21 @@ public static class ConversionCatalog
                 return new([], null);
 
             IReadOnlyList<FileFormat> targets;
-            if (ImageFormats.IsInput(path))
+            bool animated = GifAnimation.IsAnimated(path);
+            if (ImageFormats.IsInput(path) && !animated)
             {
                 hasImage = true;
                 targets = ImageFormats.Outputs;
             }
-            else if (MediaFormats.IsVideoInput(path) || MediaFormats.IsAudioInput(path))
+            else if (animated || MediaFormats.IsVideoInput(path) || MediaFormats.IsAudioInput(path))
             {
                 if (ffmpeg is null)
                 {
                     needsFfmpeg = true;
                     continue;
                 }
-                var candidates = MediaFormats.IsVideoInput(path) ? MediaFormats.VideoOutputs : MediaFormats.AudioOutputs;
+                var candidates = animated ? MediaFormats.AnimatedGifOutputs
+                    : MediaFormats.IsVideoInput(path) ? MediaFormats.VideoOutputs : MediaFormats.AudioOutputs;
                 targets = candidates.Where(f => ffmpeg.HasEncoders(MediaRecipes.For(f).Encoders)).ToList();
             }
             else

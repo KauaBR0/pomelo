@@ -27,6 +27,9 @@ public static class MediaFormats
     /// <summary>Wheel order for video inputs; MP3 extracts the soundtrack.</summary>
     public static readonly IReadOnlyList<FileFormat> VideoOutputs = [Mp4, Mov, Mkv, WebM, Avi, Wmv, AnimatedGif, Mp3];
 
+    /// <summary>Wheel order for animated GIF inputs: silent video, so no MP3 and no GIF.</summary>
+    public static readonly IReadOnlyList<FileFormat> AnimatedGifOutputs = [Mp4, Mov, Mkv, WebM, Avi, Wmv];
+
     private static readonly HashSet<string> AudioInputs = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".oga", ".opus", ".aiff", ".aif", ".wma",

@@ -8,6 +8,7 @@ using Pomelo.Core.Settings;
 using Pomelo.Core.Startup;
 using Pomelo.Input;
 using Pomelo.Interop;
+using Pomelo.Shelf;
 using Pomelo.Tray;
 using Pomelo.Wheel;
 
@@ -67,7 +68,7 @@ public partial class App : Application
         _wheel.Ffmpeg = () => _ffmpeg;
         _wheel.OperationRequested += (paths, operation) => _worker.Enqueue(new ConversionBatch(paths, operation,
             new ConversionOptions(OutputFolders.Resolve(_settings), _settings.JpegQuality), _ffmpeg));
-        _actions = new ActionRunner(() => _settings, Apply, _tray, _main, _shutdown.Token);
+        _actions = new ActionRunner(() => _settings, Apply, _tray, _main, new ShelfWindow(), _shutdown.Token);
         _wheel.Actions = _actions.For;
         _wheel.ActionRequested += (paths, action) => _actions.Run(action, paths);
         _worker.FileStarted += (path, index, count) =>

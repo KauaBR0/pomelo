@@ -6,6 +6,7 @@ using Pomelo.Conversion;
 using Pomelo.Core.Actions;
 using Pomelo.Core.Settings;
 using Pomelo.Interop;
+using Pomelo.Shelf;
 using Pomelo.Tray;
 using Forms = System.Windows.Forms;
 
@@ -24,6 +25,7 @@ internal sealed class ActionRunner
     private readonly Action<AppSettings> _apply;
     private readonly TrayIcon _tray;
     private readonly MainWindow _main;
+    private readonly ShelfWindow _shelf;
     private readonly CancellationToken _shutdown;
     private readonly IReadOnlyList<FileAction> _all;
     private readonly List<Task> _backgroundWork = [];
@@ -50,12 +52,13 @@ internal sealed class ActionRunner
     }
 
     public ActionRunner(Func<AppSettings> settings, Action<AppSettings> apply, TrayIcon tray, MainWindow main,
-        CancellationToken shutdown)
+        ShelfWindow shelf, CancellationToken shutdown)
     {
         _settings = settings;
         _apply = apply;
         _tray = tray;
         _main = main;
+        _shelf = shelf;
         _shutdown = shutdown;
         _all =
         [
@@ -66,6 +69,7 @@ internal sealed class ActionRunner
             new("Terminal", "Abrir o terminal na pasta", FilesOnly: false, OpenTerminalAsync),
             new("Compartilhar", "Compartilhar (Windows)", FilesOnly: true, ShareAsync),
             new("SHA-256", "Copiar o hash SHA-256", FilesOnly: true, CopyHashesAsync),
+            new("Flutuar", "Guardar na prateleira", FilesOnly: false, FloatAsync),
         ];
     }
 
@@ -100,6 +104,12 @@ internal sealed class ActionRunner
         SetClipboard(new Forms.DataObject(Forms.DataFormats.UnicodeText, string.Join(Environment.NewLine, paths)));
         Notify(paths.Count == 1 ? "Caminho copiado" : $"{paths.Count} caminhos copiados",
             paths.Count == 1 ? paths[0] : "Cole com Ctrl+V.", null);
+        return Task.CompletedTask;
+    }
+
+    private Task FloatAsync(IReadOnlyList<string> paths)
+    {
+        _shelf.Add(paths);
         return Task.CompletedTask;
     }
 

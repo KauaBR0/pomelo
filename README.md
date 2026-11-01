@@ -12,7 +12,7 @@ Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma i
   <tr>
     <td align="center"><img src="docs/images/wheel-convert.png" width="240" alt="Roda de conversão: JPG, PNG, TIFF, BMP e GIF, com JPG em destaque"></td>
     <td align="center"><img src="docs/images/wheel-tools.png" width="240" alt="Roda de ferramentas: 50%, girar, limpar e comprimir, com 50% em destaque"></td>
-    <td align="center"><img src="docs/images/wheel-actions.png" width="240" alt="Roda de ações: caminho, copiar, copiar em, mover, terminal, compartilhar e SHA-256, com Compartilhar em destaque"></td>
+    <td align="center"><img src="docs/images/wheel-actions.png" width="240" alt="Roda de ações: caminho, copiar, copiar em, mover, terminal, compartilhar, SHA-256 e flutuar, com Flutuar em destaque"></td>
   </tr>
   <tr>
     <td align="center"><b>Shift</b> · converter</td>
@@ -73,12 +73,23 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 | Terminal | Abre o Windows Terminal (ou o PowerShell) na pasta |
 | Compartilhar | Abre o painel Compartilhar do Windows (Compartilhamento por Proximidade, WhatsApp, e-mail…); só arquivos |
 | SHA-256 | Copia o hash; para vários arquivos, no formato do `sha256sum`; só arquivos |
+| Flutuar | Guarda os itens numa prateleira flutuante, para arrastá-los depois (veja abaixo) |
 
 "Copiar em…" e "Mover…" lembram a última pasta usada, nunca substituem nada (um nome já usado vira `nome (1)`) e não colocam uma pasta dentro dela mesma, inclusive por junções ou aliases de disco.
 
 - Cópias são montadas como `~pomelo-….part` e só recebem o nome final quando completas. Ao sair, o app cancela a cópia e aguarda sua limpeza por até 5 segundos; um encerramento forçado pode deixar um `.part`, mas não uma cópia incompleta com aparência de concluída.
 - Mover a raiz de um disco é recusado. Entre discos, a origem só é removida depois da cópia completa; se não for possível apagá-la, o destino é mantido e aparece um **aviso**, com o caminho da cópia.
 - Junções e links de pastas dentro de uma cópia são ignorados com aviso. Mover uma árvore com esses links entre discos é recusado; use o Explorer nesse caso.
+
+### Prateleira (Flutuar)
+
+Útil para juntar arquivos de pastas diferentes ou levar algo para uma janela que está escondida.
+
+- **Flutuar** na roda de ações abre uma pequena prateleira no canto da tela com os itens arrastados. Solte mais arquivos sobre ela para acrescentar.
+- Arraste **tudo** pelo cartão "Arraste daqui", ou **um item** pela própria linha, para qualquer pasta ou app. Durante esse arraste, Shift, Ctrl e Alt abrem as rodas normalmente.
+- A prateleira guarda só o caminho: nada é copiado ao guardar, e ao arrastar para fora ela oferece somente **cópia**, então o original nunca sai do lugar.
+- Itens movidos ou apagados aparecem como "não encontrado" e ficam de fora do arraste. O ✕ de uma linha tira o item da prateleira sem apagar o arquivo; o ✕ do topo esvazia e fecha.
+- A prateleira fica por cima das janelas sem roubar o foco e pode ser movida pelo título. A lista não é salva ao sair do Pomelo.
 
 ## Formatos
 
@@ -199,7 +210,6 @@ tests/Pomelo.Tests/  testes do núcleo (xUnit)
 
 ## Próximos passos
 
-- "Flutuar": manter itens numa prateleira na tela para soltar depois
 - Editores com ajuste fino (recortar, escolher tamanho/qualidade, cortar áudio e vídeo)
 - PDF e documentos
 - Instalador

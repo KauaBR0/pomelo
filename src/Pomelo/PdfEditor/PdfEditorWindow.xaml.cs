@@ -266,9 +266,11 @@ internal sealed partial class PdfEditorWindow : Window
             ShowPage(item.Line.Page);
         else
             DrawOverlay();
+        // Scroll only when the line is out of view: clicking a visible line must not move the page under the cursor.
         var rect = PageRect(item);
-        double top = rect.Y + 16 - PageScroll.ViewportHeight / 3;
-        PageScroll.ScrollToVerticalOffset(Math.Max(0, top));
+        double top = rect.Y + PageHost.Margin.Top, bottom = top + rect.Height;
+        if (top < PageScroll.VerticalOffset || bottom > PageScroll.VerticalOffset + PageScroll.ViewportHeight)
+            PageScroll.ScrollToVerticalOffset(Math.Max(0, top - PageScroll.ViewportHeight / 3));
     }
 
     private void OnPageClicked(object sender, MouseButtonEventArgs e)

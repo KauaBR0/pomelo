@@ -76,6 +76,8 @@ A linha alterada mantém fonte, tamanho, cor e posição, e o texto antigo sai d
 
 A edição usa o [PDFium](https://pdfium.googlesource.com/pdfium/), o motor de PDF do Chrome (licença BSD), na compilação de [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries) (Apache-2.0), que vem junto com o Pomelo.
 
+O mesmo editor existe como app independente, para quem só quer editar PDFs: [Lima](https://github.com/KauaBR0/lima).
+
 ## Ações
 
 Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão possível.

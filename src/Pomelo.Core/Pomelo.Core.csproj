@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- 10.0.19041 (Windows 10 2004): WinRT projections for Windows.Data.Pdf (PDF pages → images). -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- WPF imaging = Windows Imaging Component (WIC), the Windows counterpart of ImageIO. -->

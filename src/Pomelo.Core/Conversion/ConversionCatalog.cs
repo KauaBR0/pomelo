@@ -10,16 +10,20 @@ public static class ConversionCatalog
 {
     public const string FfmpegRequiredHint = "Requer FFmpeg";
 
+    /// <summary>Wheel order for still images; PDF combines every dropped image into one file.</summary>
+    private static readonly IReadOnlyList<FileFormat> ImageTargets = [.. ImageFormats.Outputs, DocumentFormats.Pdf];
+
     /// <summary>
     /// Targets valid for every path (intersection), in the first file's wheel order. A target
     /// is omitted when every input already has that format. Audio/video targets the FFmpeg
-    /// build cannot encode are omitted. An animated GIF counts as silent video. Any folder,
-    /// missing or unknown file disables conversion.
+    /// build cannot encode are omitted. An animated GIF counts as silent video. Images can also
+    /// become one PDF; a PDF's pages can become images. Any folder, missing or unknown file
+    /// disables conversion.
     /// </summary>
     public static ConversionChoices For(IReadOnlyCollection<string> paths, FfmpegInfo? ffmpeg)
     {
         IReadOnlyList<FileFormat>? common = null;
-        bool needsFfmpeg = false, hasImage = false;
+        bool needsFfmpeg = false, hasNonMedia = false;
 
         foreach (string path in paths)
         {
@@ -30,8 +34,13 @@ public static class ConversionCatalog
             bool animated = GifAnimation.IsAnimated(path);
             if (ImageFormats.IsInput(path) && !animated)
             {
-                hasImage = true;
-                targets = ImageFormats.Outputs;
+                hasNonMedia = true;
+                targets = ImageTargets;
+            }
+            else if (DocumentFormats.Pdf.Matches(path))
+            {
+                hasNonMedia = true;
+                targets = DocumentFormats.PdfPageOutputs;
             }
             else if (animated || MediaFormats.IsVideoInput(path) || MediaFormats.IsAudioInput(path))
             {
@@ -53,7 +62,7 @@ public static class ConversionCatalog
         }
 
         if (needsFfmpeg)
-            return new([], hasImage ? null : FfmpegRequiredHint); // Images and media never share a target.
+            return new([], hasNonMedia ? null : FfmpegRequiredHint); // Images/PDFs and media never share a target.
         if (common is null)
             return new([], null);
         return new(common.Where(f => !paths.All(f.Matches)).ToList(), null);

@@ -45,6 +45,14 @@ public static class ImageConverter
         }
         image = transform(image);
 
+        byte[] encoded = Encode(image, target, options, embedsProfile ? colorContexts : null);
+        return UniqueFileWriter.Write(directory, outputName, target.Extension, encoded);
+    }
+
+    /// <summary>Encodes as <paramref name="target"/>; transparency goes onto white where the format has none.</summary>
+    internal static byte[] Encode(BitmapSource image, FileFormat target, ConversionOptions options,
+        ReadOnlyCollection<ColorContext>? colorContexts = null)
+    {
         BitmapEncoder encoder = target switch
         {
             _ when target == ImageFormats.Jpeg => new JpegBitmapEncoder
@@ -58,18 +66,27 @@ public static class ImageConverter
             _ => throw new ArgumentOutOfRangeException(nameof(target), target.Name, "Formato de saída desconhecido."),
         };
 
-
         if (target == ImageFormats.Jpeg || target == ImageFormats.Bmp)
             image = FlattenOnWhite(image);
         else if (target == ImageFormats.Gif)
             image = ToPalette(FlattenOnWhite(image));
 
-        encoder.Frames.Add(BitmapFrame.Create(image, null, null, embedsProfile ? colorContexts : null));
-
+        encoder.Frames.Add(BitmapFrame.Create(image, null, null, colorContexts));
         using var buffer = new MemoryStream();
         encoder.Save(buffer);
+        return buffer.ToArray();
+    }
 
-        return UniqueFileWriter.Write(directory, outputName, target.Extension, buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+    /// <summary>
+    /// For writing into other containers (PDF pages): orientation baked in, any embedded profile
+    /// converted to sRGB, transparency on white. Always <see cref="PixelFormats.Bgr32"/>.
+    /// </summary>
+    internal static BitmapSource LoadOpaqueSrgb(string path)
+    {
+        BitmapSource image = Load(path, out var colorContexts);
+        if (colorContexts is { Count: > 0 })
+            image = ToSrgb(image, colorContexts[0]);
+        return FlattenOnWhite(image);
     }
 
     private static bool IsRgb(PixelFormat format) =>

@@ -89,7 +89,7 @@ public static class FileTransfer
         if (rename)
         {
             string moved = isFolder
-                ? MoveFolderIntoPlace(sourcePath, target.Path, baseName)
+                ? UniqueFileWriter.MoveFolderIntoPlace(sourcePath, target.Path, baseName)
                 : UniqueFileWriter.MoveIntoPlace(sourcePath, target.Path, baseName, extension);
             return new(sourcePath, moved, null);
         }
@@ -135,7 +135,7 @@ public static class FileTransfer
         {
             CopyContents(source, temp, ref skippedLinks, cancellation, manifest);
             cancellation.ThrowIfCancellationRequested();
-            return MoveFolderIntoPlace(temp, destination, baseName);
+            return UniqueFileWriter.MoveFolderIntoPlace(temp, destination, baseName);
         }
         catch
         {
@@ -218,23 +218,6 @@ public static class FileTransfer
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CopyFileExW(string existing, string newFile, CopyProgressRoutine progress, IntPtr data,
         ref int cancel, uint flags);
-
-    private static string MoveFolderIntoPlace(string folder, string destination, string baseName)
-    {
-        foreach (string candidate in UniqueFileWriter.Candidates(destination, baseName, ""))
-        {
-            try
-            {
-                Directory.Move(folder, candidate);
-                return candidate;
-            }
-            catch (IOException ex) when (UniqueFileWriter.IsTaken(ex))
-            {
-                // Taken between the check and the rename: try the next name.
-            }
-        }
-        throw new System.Diagnostics.UnreachableException();
-    }
 
     /// <summary>Remove only copied, unchanged entries. New source entries must survive a move.</summary>
     private static string? DeleteSource(CopyManifest manifest)

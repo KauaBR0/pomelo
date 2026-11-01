@@ -56,6 +56,25 @@ public static class UniqueFileWriter
         throw new UnreachableException();
     }
 
+    /// <summary>Renames a finished folder (same volume) to "name", or "name (n)" when taken.</summary>
+    /// <returns>The final path.</returns>
+    public static string MoveFolderIntoPlace(string folder, string directory, string baseName)
+    {
+        foreach (string candidate in Candidates(directory, baseName, ""))
+        {
+            try
+            {
+                Directory.Move(folder, candidate);
+                return candidate;
+            }
+            catch (IOException ex) when (IsTaken(ex))
+            {
+                // Taken between the check and the rename: try the next name.
+            }
+        }
+        throw new UnreachableException();
+    }
+
     /// <summary>"name.ext", "name (1).ext", … skipping names that already exist (files or folders).</summary>
     internal static IEnumerable<string> Candidates(string directory, string baseName, string extension)
     {

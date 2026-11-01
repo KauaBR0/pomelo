@@ -16,8 +16,8 @@ public static class ToolCatalog
     public static ToolChoices For(IReadOnlyCollection<string> paths, FfmpegInfo? ffmpeg)
     {
         var kinds = paths.Select(p => File.Exists(p) ? InputKind.Of(p) : null).Distinct().ToList();
-        if (kinds is not [MediaKind kind])
-            return new([], null);
+        if (kinds is not [MediaKind kind] || kind == MediaKind.Document)
+            return new([], null); // No document tools yet.
 
         if (kind == MediaKind.Image)
             return new(FileTools.ForImages, null);

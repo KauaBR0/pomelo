@@ -23,7 +23,7 @@ Conversor de arquivos offline para Windows, sem cliques: comece a arrastar uma i
 
 Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac. Projeto independente, sem relação com o Tangerine.
 
-> **Estado:** em desenvolvimento. Converte imagens, áudio e vídeo; PDF e documentos ainda não.
+> **Estado:** em desenvolvimento. Converte imagens, áudio, vídeo e PDF (páginas ↔ imagens); documentos do Office ainda não.
 
 ## Como usar
 
@@ -97,7 +97,7 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 
 | | Formatos |
 |---|---|
-| **Saída** | JPG, PNG, TIFF, BMP, GIF |
+| **Saída** | JPG, PNG, TIFF, BMP, GIF, PDF (todas as imagens arrastadas num só arquivo) |
 | **Entrada** | JPG, PNG, TIFF, BMP, GIF, ICO, JPEG XR |
 | **Entrada, com extensão da Microsoft Store** | WebP, HEIC/HEIF, AVIF |
 
@@ -105,6 +105,16 @@ Funcionam com qualquer item: pastas, tipos misturados e arquivos sem conversão 
 - Em JPG, BMP e GIF (sem transparência), áreas transparentes viram fundo branco. GIF usa uma paleta otimizada de 256 cores.
 - Perfis RGB são preservados em JPG, PNG e TIFF. Imagens CMYK/cinza com perfil, e saídas BMP/GIF, são convertidas para sRGB; o perfil de origem não é anexado a pixels de outro espaço de cor.
 - GIF animado vira vídeo pela roda de conversão (veja abaixo). As ferramentas de imagem e TIFF com várias páginas ainda não aceitam arquivos com vários quadros: o Pomelo recusa com uma mensagem, em vez de descartar quadros em silêncio.
+
+### PDF (sem instalar nada)
+
+| | Formatos |
+|---|---|
+| **Imagens → PDF** | Todas as imagens arrastadas viram **um** PDF, uma por página |
+| **PDF → imagens** | JPG ou PNG, uma imagem por página |
+
+- **Imagens → PDF:** as páginas seguem a ordem do arraste e o arquivo leva o nome da primeira imagem (`foto.pdf`). Cada página tem o tamanho da própria imagem, calculado pela resolução (DPI) dela, ou 96 DPI quando o arquivo não informa; nada é cortado nem esticado. Fotos são guardadas em JPEG (com a qualidade das configurações); prints, desenhos e PNGs, sem perda. Transparência vira fundo branco. Se uma das imagens não puder ser lida, nenhum PDF é criado e a mensagem diz qual arquivo falhou.
+- **PDF → imagens:** usa o leitor de PDF do próprio Windows, a 200 DPI, com fundo branco. Um PDF de uma página vira `doc.png`; com várias páginas, vira a pasta `doc` com `página 01.png`, `página 02.png`… A pasta só aparece com esse nome depois que todas as páginas foram geradas. PDFs protegidos por senha são recusados com uma mensagem.
 
 ### Áudio e vídeo (requer FFmpeg)
 
@@ -211,7 +221,6 @@ tests/Pomelo.Tests/  testes do núcleo (xUnit)
 ## Próximos passos
 
 - Editores com ajuste fino (recortar, escolher tamanho/qualidade, cortar áudio e vídeo)
-- PDF e documentos
 - Instalador
 
 ## Licença

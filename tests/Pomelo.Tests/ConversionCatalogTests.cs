@@ -28,16 +28,26 @@ public sealed class ConversionCatalogTests : IDisposable
     [Fact]
     public void Same_format_inputs_do_not_offer_their_own_format()
     {
-        Assert.Equal(["JPG", "TIFF", "BMP", "GIF"], Names(ConversionCatalog.For([Touch("a.png"), Touch("b.PNG")], null)));
+        Assert.Equal(["JPG", "TIFF", "BMP", "GIF", "PDF"], Names(ConversionCatalog.For([Touch("a.png"), Touch("b.PNG")], null)));
         Assert.Equal(["M4A", "WAV", "FLAC", "OGG", "OPUS", "AIFF", "WMA"],
             Names(ConversionCatalog.For([Touch("a.mp3"), Touch("b.mp3")], FullFfmpeg)));
     }
 
     [Fact]
-    public void Mixed_image_formats_offer_every_image_output()
+    public void Mixed_image_formats_offer_every_image_output_and_pdf()
     {
-        Assert.Equal(Names(new(ImageFormats.Outputs, null)),
+        Assert.Equal(["JPG", "PNG", "TIFF", "BMP", "GIF", "PDF"],
             Names(ConversionCatalog.For([Touch("a.png"), Touch("b.jpg")], null)));
+    }
+
+    [Fact]
+    public void Pdf_pages_become_jpg_or_png_alone_or_with_images()
+    {
+        string pdf = Touch("doc.PDF");
+        Assert.Equal(["JPG", "PNG"], Names(ConversionCatalog.For([pdf], null)));
+        Assert.Equal(["JPG", "PNG"], Names(ConversionCatalog.For([pdf, Touch("a.heic")], null)));
+        Assert.Empty(ConversionCatalog.For([pdf, Touch("clip.mp4")], FullFfmpeg).Targets);
+        Assert.Null(ConversionCatalog.For([pdf, Touch("song.mp3")], null).Hint); // FFmpeg would not help.
     }
 
     [Fact]
@@ -93,7 +103,7 @@ public sealed class ConversionCatalogTests : IDisposable
         string animated = Gif("anim.gif", frames: 2);
 
         Assert.Equal(["MP4", "MOV", "MKV", "WEBM", "AVI", "WMV"], Names(ConversionCatalog.For([animated], FullFfmpeg)));
-        Assert.Equal(["JPG", "PNG", "TIFF", "BMP"], Names(ConversionCatalog.For([Gif("still.gif", frames: 1)], FullFfmpeg)));
+        Assert.Equal(["JPG", "PNG", "TIFF", "BMP", "PDF"], Names(ConversionCatalog.For([Gif("still.gif", frames: 1)], FullFfmpeg)));
         Assert.Equal(["MP4", "MOV", "MKV", "WEBM", "AVI", "WMV"], Names(ConversionCatalog.For([animated, Touch("clip.mp4")], FullFfmpeg)));
         Assert.Equal(ConversionCatalog.FfmpegRequiredHint, ConversionCatalog.For([animated], null).Hint);
     }

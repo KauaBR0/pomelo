@@ -54,17 +54,25 @@ internal sealed class ConversionWorker : IDisposable
 
     private void RunBatch(ConversionBatch batch)
     {
-        var results = new List<ConversionResult>(batch.Paths.Count);
-        for (int i = 0; i < batch.Paths.Count; i++)
+        // A combining operation (images → one PDF) is a single job named after the first file.
+        var jobs = batch.Operation is ICombiningOperation
+            ? [batch.Paths]
+            : batch.Paths.Select(p => (IReadOnlyList<string>)[p]).ToList();
+        var results = new List<ConversionResult>(jobs.Count);
+        for (int i = 0; i < jobs.Count; i++)
         {
-            string path = batch.Paths[i];
+            var paths = jobs[i];
+            string path = paths[0];
             int index = i + 1;
-            _dispatcher.BeginInvoke(() => FileStarted?.Invoke(path, index, batch.Paths.Count));
+            _dispatcher.BeginInvoke(() => FileStarted?.Invoke(path, index, jobs.Count));
 
             ConversionResult result;
             try
             {
-                result = new(path, batch.Operation.Apply(path, batch.Options, batch.Ffmpeg, _shutdown.Token), null);
+                string output = batch.Operation is ICombiningOperation combine
+                    ? combine.ApplyAll(paths, batch.Options, _shutdown.Token)
+                    : batch.Operation.Apply(path, batch.Options, batch.Ffmpeg, _shutdown.Token);
+                result = new(path, output, null);
             }
             catch (OperationCanceledException)
             {

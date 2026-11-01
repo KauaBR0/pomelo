@@ -188,7 +188,7 @@ internal sealed partial class WheelWindow : Window
         {
             case WheelMode.Convert:
                 var conversions = ConversionCatalog.For(_paths, Ffmpeg());
-                _items = FromOperations(conversions.Targets.Select(t => new ConvertOperation(t)));
+                _items = FromOperations(conversions.Targets.Select(ConvertOperation.For));
                 _hint = conversions.Hint;
                 break;
             case WheelMode.Tools:

@@ -1,4 +1,5 @@
-using System.Buffers;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using Pomelo.Core.Conversion;
 using Pomelo.Core.IO;
 
@@ -176,30 +177,47 @@ public static class FileTransfer
         return false;
     }
 
+    /// <summary>
+    /// CopyFileEx keeps what Explorer keeps (timestamps, attributes, alternate streams such as the
+    /// "downloaded from the internet" mark) and stops mid-file when cancelled.
+    /// </summary>
     private static void CopyFile(string source, string destination, CancellationToken cancellation, CopyManifest? manifest)
     {
-        using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
-        using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        var before = new FileInfo(source); // Snapshot first: a change during the copy must keep the source.
+        long length = before.Length;
+        DateTime written = before.LastWriteTimeUtc;
+
+        CopyProgressRoutine progress = (_, _, _, _, _, _, _, _, _) =>
+            cancellation.IsCancellationRequested ? PROGRESS_CANCEL : PROGRESS_CONTINUE;
+        int cancel = 0;
+        bool ok = CopyFileExW(source, destination, progress, IntPtr.Zero, ref cancel, COPY_FILE_FAIL_IF_EXISTS);
+        int error = Marshal.GetLastPInvokeError();
+        GC.KeepAlive(progress);
+        if (!ok)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(1024 * 1024);
-            try
-            {
-                int count;
-                while ((count = input.Read(buffer)) != 0)
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    output.Write(buffer, 0, count);
-                }
-                manifest?.Files.Add(new(source, input.Length, File.GetLastWriteTimeUtc(source)));
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+            if (error == ERROR_REQUEST_ABORTED)
+                cancellation.ThrowIfCancellationRequested();
+            string message = $"{new Win32Exception(error).Message} ({Path.GetFileName(source)})";
+            if (error == ERROR_ACCESS_DENIED)
+                throw new UnauthorizedAccessException(message);
+            throw new IOException(message, unchecked((int)0x80070000) | error);
         }
-        File.SetAttributes(destination, File.GetAttributes(source) & (FileAttributes.ReadOnly |
-            FileAttributes.Hidden | FileAttributes.System | FileAttributes.Archive));
+        manifest?.Files.Add(new(source, length, written));
     }
+
+    private const uint COPY_FILE_FAIL_IF_EXISTS = 0x1;
+    private const uint PROGRESS_CONTINUE = 0;
+    private const uint PROGRESS_CANCEL = 1;
+    private const int ERROR_ACCESS_DENIED = 5;
+    private const int ERROR_REQUEST_ABORTED = 1235;
+
+    private delegate uint CopyProgressRoutine(long totalSize, long transferred, long streamSize, long streamTransferred,
+        uint streamNumber, uint reason, IntPtr sourceFile, IntPtr destinationFile, IntPtr data);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CopyFileExW(string existing, string newFile, CopyProgressRoutine progress, IntPtr data,
+        ref int cancel, uint flags);
 
     private static string MoveFolderIntoPlace(string folder, string destination, string baseName)
     {

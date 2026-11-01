@@ -58,6 +58,23 @@ public sealed class FileTransferTests : IDisposable
     }
 
     [Theory]
+    [InlineData(TransferMode.Copy, false)]
+    [InlineData(TransferMode.Move, true)]
+    public void Copies_keep_modified_time_and_the_downloaded_from_internet_mark(TransferMode mode, bool otherVolume)
+    {
+        string file = Write(@"source\album\setup.exe", "x");
+        File.WriteAllText(file + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3\r\n");
+        var written = new DateTime(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(file, written);
+
+        var result = FileTransfer.Run([Path.Combine(Source, "album")], Target, mode, default, otherVolume).Single();
+
+        string copy = Path.Combine(result.Destination!, "setup.exe");
+        Assert.Equal(written, File.GetLastWriteTimeUtc(copy));
+        Assert.Contains("ZoneId=3", File.ReadAllText(copy + ":Zone.Identifier"));
+    }
+
+    [Theory]
     [InlineData(TransferMode.Copy)]
     [InlineData(TransferMode.Move)]
     public void Folders_transfer_with_their_whole_tree(TransferMode mode)

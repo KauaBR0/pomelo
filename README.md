@@ -25,6 +25,12 @@ Inspirado no [Tangerine](https://tangerineformac.com/), que existe só para Mac.
 
 > **Estado:** em desenvolvimento. Converte imagens, áudio, vídeo e PDF (páginas ↔ imagens) e edita os textos de PDFs; documentos do Office ainda não.
 
+## Baixar
+
+Baixe `Pomelo-<versão>-win-x64.zip` na página de [Releases](https://github.com/KauaBR0/pomelo/releases/latest), extraia e abra o `Pomelo.exe`. Não precisa instalar nada: o .NET já vai dentro do `.exe`. Requer Windows 10 versão 2004 ou mais recente, ou Windows 11 (x64). Áudio e vídeo continuam precisando do FFmpeg (veja [FFmpeg](#ffmpeg)).
+
+Como o `.exe` não é assinado digitalmente, o Windows pode mostrar "O Windows protegeu o computador" na primeira vez: clique em **Mais informações** → **Executar assim mesmo**.
+
 ## Como usar
 
 1. Abra o Pomelo. Ele fica na bandeja do sistema (perto do relógio; na primeira vez pode estar em "Mostrar ícones ocultos").
@@ -199,6 +205,8 @@ dotnet test
 
 Os testes de áudio e vídeo rodam o FFmpeg de verdade e são pulados se ele ou os codificadores exigidos pelo teste não estiverem disponíveis.
 
+Para gerar a versão de download (um `Pomelo.exe` único, com o .NET embutido) em `artifacts/`: `./release.ps1`. A versão vem de `<Version>` em `src/Pomelo/Pomelo.csproj`.
+
 ### Desinstalar
 
 Desmarque "Iniciar com o Windows" (ou apague o valor `Pomelo` na chave `Run`), saia pela bandeja e apague a pasta `%APPDATA%\Pomelo`.
@@ -244,4 +252,4 @@ tests/Pomelo.Tests/  testes do núcleo (xUnit)
 
 ## Licença
 
-[MIT](LICENSE)
+[MIT](LICENSE). Avisos de terceiros (PDFium, .NET) em [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
